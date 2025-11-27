@@ -1,0 +1,40 @@
+{
+  "name": "eval-kit",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for content evaluation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "evaluation",
+    "content",
+    "sdk",
+    "typescript",
+    "llm",
+    "ai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.20.0",
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.7",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.1",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  }
+}
