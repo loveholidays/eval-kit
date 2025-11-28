@@ -1,13 +1,20 @@
-# Translation Metrics Guide
+# Metrics Guide
 
 This document provides detailed information about the translation quality metrics implemented in eval-kit.
 
 ## Table of Contents
 
+### Metrics to evaluate translation using reference texts
+
 - [BLEU Score](#bleu-score)
 - [TER (Translation Edit Rate)](#ter-translation-edit-rate)
 - [BERTScore](#bertscore)
 - [Comparison & When to Use Each](#comparison--when-to-use-each)
+
+### Metrics to evaluate AI-generated content without reference texts
+
+- [Coherence](#coherence)
+- [Perplexity](#perplexity)
 
 ---
 
@@ -386,3 +393,424 @@ async function comprehensiveEvaluation(candidate: string, reference: string) {
 | Low | Low | High | Creative paraphrase - different words, same meaning |
 | High | High | Low | Word overlap but semantic drift |
 | Low | Low | Low | Poor translation - needs revision |
+
+---
+
+## Coherence
+
+### What is Coherence?
+
+Coherence measures how well sentences in a text connect and flow together logically. A coherent text has smooth transitions between ideas, maintains topic continuity, and creates a unified narrative or argument. Unlike translation metrics that require reference texts, coherence evaluates text quality independently.
+
+**Key aspects:**
+- **Semantic relatedness**: Do consecutive sentences discuss related topics?
+- **Logical flow**: Do ideas progress naturally from one sentence to the next?
+- **Topic continuity**: Does the text maintain focus on its subject matter?
+
+### How it Works
+
+Coherence is measured using **TF-IDF (Term Frequency-Inverse Document Frequency)** vectors and **cosine similarity**:
+
+1. **Split text into sentences**
+2. **Tokenize each sentence** into words
+3. **Calculate TF-IDF vectors** for each sentence:
+   - **TF (Term Frequency)**: How often a word appears in a sentence
+   - **IDF (Inverse Document Frequency)**: How unique a word is across all sentences
+   - TF-IDF weights words by importance (common words get lower weights)
+4. **Calculate cosine similarity** between consecutive sentence pairs
+5. **Average all similarities** to get overall coherence score (0-100)
+
+**Example:**
+```
+Text: "The cat sat on the mat. The feline appeared comfortable."
+
+Sentence 1 TF-IDF: {cat: 0.69, sat: 0.69, mat: 0.69, the: 0}
+Sentence 2 TF-IDF: {feline: 0.69, appeared: 0.69, comfortable: 0.69, the: 0}
+
+Cosine similarity: ~0.15 (low - no shared content words)
+Coherence score: 15
+```
+
+Higher average similarity = better coherence = sentences share more related vocabulary.
+
+### Score Range
+
+- **0-100**: Higher is better
+- **90-100**: Excellent - very strong semantic connections and smooth flow
+- **75-89**: Good - strong connections with mostly smooth transitions
+- **60-74**: Fair - moderate coherence with some noticeable gaps
+- **40-59**: Poor - weak connections and frequent topic shifts
+- **0-39**: Very poor - disconnected sentences with no clear topic continuity
+
+### Usage Example
+
+```typescript
+import { calculateCoherence } from 'eval-kit';
+
+const text = `
+  The cat sat on the mat.
+  The feline appeared comfortable on the soft surface.
+  It purred contentedly while resting there.
+`;
+
+const result = calculateCoherence(text);
+
+console.log(result.score);                    // 45.67
+console.log(result.sentenceCount);            // 3
+console.log(result.pairwiseSimilarities);     // [0.42, 0.51]
+console.log(result.averageSimilarity);        // 0.4567
+console.log(result.feedback);                 // "Poor coherence with weak connections..."
+```
+
+### Configuration Options
+
+```typescript
+interface CoherenceOptions {
+  minSentences?: number;  // Default: 2 (min sentences to evaluate)
+}
+```
+
+### Examples
+
+#### Example 1: High Coherence (Score: ~75)
+
+```typescript
+const text = `
+  The cat sat on the mat.
+  The feline appeared comfortable on the soft surface.
+  It purred contentedly while resting there.
+`;
+
+const result = calculateCoherence(text);
+// Sentences share vocabulary: cat/feline, mat/surface/resting
+// Strong topical continuity about a cat resting
+```
+
+#### Example 2: Low Coherence (Score: ~5)
+
+```typescript
+const text = `
+  The cat sat on the mat.
+  Quantum physics explains atomic behavior.
+  Pizza is a popular Italian food.
+`;
+
+const result = calculateCoherence(text);
+// No shared vocabulary or topic continuity
+// Abrupt topic changes between sentences
+```
+
+#### Example 3: Medium Coherence (Score: ~55)
+
+```typescript
+const text = `
+  The weather was sunny today.
+  Many people went to the beach.
+  Swimming in the ocean is refreshing.
+`;
+
+const result = calculateCoherence(text);
+// Moderate topic relationship: weather → beach → swimming
+// Some semantic connection but not as tight
+```
+
+### Strengths
+
+- ✅ Fast computation (< 10ms for typical text)
+- ✅ No external dependencies or ML models needed
+- ✅ Language-agnostic (works for any language)
+- ✅ Interpretable results (can see which sentence pairs are weak)
+- ✅ Works without reference texts
+
+### Limitations
+
+- ❌ Only measures lexical overlap, not deep semantic meaning
+- ❌ May give high scores to keyword-stuffed text
+- ❌ Doesn't understand pronoun references or discourse markers
+- ❌ Can miss coherence from world knowledge or logical reasoning
+- ❌ Short texts with few sentences may be misleading
+
+**Example of limitation:**
+```typescript
+// High coherence score but semantically incoherent:
+const text = `
+  The cat sat on the mat with the cat.
+  The mat had a cat and the cat liked the mat.
+`;
+// Score: ~95 (lots of shared words: cat, mat)
+// But semantically repetitive and unnatural
+```
+
+### When to Use
+
+**Good use cases:**
+- Evaluating AI-generated stories, articles, or essays
+- Assessing text summarization quality
+- Checking if content flows naturally
+- Detecting topic drift in long-form content
+- Quality assurance for generated content
+
+**Not suitable for:**
+- Very short texts (1-2 sentences)
+- Lists or bullet points (not meant to be coherent)
+- Poetry or creative writing with intentional disjunction
+- Technical documentation with section breaks
+
+### Reference
+
+This implementation uses the TF-IDF lexical coherence approach, a standard method in computational linguistics for measuring text cohesion through vocabulary overlap.
+
+---
+
+## Perplexity
+
+### What is Perplexity?
+
+Perplexity measures how "surprising" or "unexpected" text is to a language model. It quantifies how well a language model predicts a sequence of words. **Lower perplexity = more natural, predictable text**. Higher perplexity indicates unusual, awkward, or nonsensical word sequences.
+
+Perplexity is particularly useful for evaluating AI-generated content, as it can detect unnatural language patterns that may not be caught by other metrics.
+
+**Mathematical definition:**
+```
+Perplexity(W) = exp(-1/N × Σ log P(wᵢ | w₁...wᵢ₋₁))
+```
+
+Where:
+- `W` = sequence of words
+- `N` = number of words
+- `P(wᵢ | w₁...wᵢ₋₁)` = probability of word `wᵢ` given previous words
+
+### How it Works
+
+This implementation uses a **neural language model (GPT-2)** approach:
+
+1. **Load pre-trained language model** (DistilGPT-2 by default, cached after first use)
+2. **Tokenize input text** into tokens
+3. **Calculate token probabilities**: For each token, get the probability the model assigns to it given the previous context
+4. **Compute perplexity**:
+   - Average the log probabilities across all tokens
+   - Take the exponential to get perplexity
+5. **Normalize to 0-100 scale**: Convert perplexity to a quality score where higher = better
+
+**Important**: Like BERTScore, Perplexity runs **completely locally** on your machine. The model is downloaded once (~150MB for DistilGPT-2) and cached. All inference happens offline on your CPU with no network calls or API costs.
+
+**Example:**
+```
+Text: "The cat sat on the mat"
+
+Token-by-token probabilities:
+  "The" → P = 0.15 (common sentence start)
+  "cat" | "The" → P = 0.08 (reasonable after "The")
+  "sat" | "The cat" → P = 0.12 (common verb for cat)
+  "on" | "The cat sat" → P = 0.18 (natural preposition)
+  "the" | "The cat sat on" → P = 0.25 (expected article)
+  "mat" | "The cat sat on the" → P = 0.06 (makes sense)
+
+Average log probability: -2.8
+Perplexity: exp(2.8) ≈ 16.4
+Score: 92 (excellent - natural text)
+```
+
+### Score Range
+
+The metric returns both raw perplexity and a normalized score (0-100):
+
+**Raw Perplexity:**
+- **< 20**: Excellent - very natural, human-like text
+- **20-50**: Good - mostly natural with minor awkwardness
+- **50-100**: Fair - somewhat unnatural or unusual phrasing
+- **100-300**: Poor - many awkward or unlikely sequences
+- **> 300**: Very poor - nonsensical or extremely unnatural
+
+**Normalized Score (0-100):**
+- **90-100**: Excellent quality (perplexity < 20)
+- **70-90**: Good quality (perplexity 20-50)
+- **40-70**: Fair quality (perplexity 50-100)
+- **10-40**: Poor quality (perplexity 100-300)
+- **0-10**: Very poor quality (perplexity > 300)
+
+### Usage Example
+
+```typescript
+import { calculatePerplexity } from 'eval-kit';
+
+const text = "The cat sat on the mat and looked very comfortable.";
+
+const result = await calculatePerplexity(text);
+
+console.log(result.perplexity);        // 15.3
+console.log(result.score);             // 94.2
+console.log(result.tokenCount);        // 12
+console.log(result.averageLogProb);    // -2.73
+console.log(result.modelUsed);         // "distilgpt2"
+console.log(result.feedback);          // "Excellent text quality..."
+```
+
+### Configuration Options
+
+```typescript
+interface PerplexityOptions {
+  model?: string;    // Default: "distilgpt2"
+  stride?: number;   // Default: 512 (sliding window stride)
+}
+
+// Available models:
+// - "distilgpt2" (recommended, fast, ~150MB)
+// - "gpt2" (larger, more accurate, ~500MB)
+// - "gpt2-medium" (even larger, ~1.5GB)
+```
+
+### Examples
+
+#### Example 1: Low Perplexity (Score: ~94)
+
+```typescript
+const text = `
+  The cat sat on the mat and looked very comfortable.
+  It was a sunny afternoon and the feline was clearly content.
+  Soon it began to purr softly while resting.
+`;
+
+const result = await calculatePerplexity(text);
+// Perplexity: ~15.3
+// Score: 94.2
+// Natural, fluent text with common word sequences
+```
+
+#### Example 2: High Perplexity (Score: ~8)
+
+```typescript
+const text = `
+  Colorless green ideas sleep furiously.
+  The bicycle swims through yesterday's mathematics.
+`;
+
+const result = await calculatePerplexity(text);
+// Perplexity: ~287.5
+// Score: 8.1
+// Grammatically correct but semantically nonsensical
+// Language model assigns low probability to these sequences
+```
+
+#### Example 3: Very High Perplexity (Score: ~1)
+
+```typescript
+const text = "xkcd zymurgy quixotic fnord blatherskite gobbledygook";
+
+const result = await calculatePerplexity(text);
+// Perplexity: ~1523.7
+// Score: 0.9
+// Random uncommon words with no coherent meaning
+// Extremely low probabilities for these sequences
+```
+
+### Strengths
+
+- ✅ Detects unnatural language patterns
+- ✅ Based on statistical language modeling
+- ✅ Works without reference texts
+- ✅ Sensitive to fluency and grammaticality
+- ✅ Can identify AI-generated text anomalies
+- ✅ Context-aware (considers word sequences, not just individual words)
+
+### Limitations
+
+- ❌ Requires model download (~150MB for DistilGPT-2)
+- ❌ Slower than lexical metrics (100-500ms per evaluation)
+- ❌ Depends on quality of language model
+- ❌ May penalize creative or domain-specific language
+- ❌ Higher memory usage (~800MB RAM)
+- ❌ Does NOT measure factual correctness or semantic coherence
+- ❌ Model trained primarily on English text
+
+**Important caveat:**
+```typescript
+// Low perplexity doesn't guarantee good content:
+const text = "The the the the the the the.";
+// Perplexity: might be relatively low (common word)
+// But clearly poor quality text
+
+// Use perplexity WITH other metrics like coherence
+```
+
+### When to Use
+
+**Good use cases:**
+- Evaluating fluency of AI-generated text
+- Detecting machine-generated vs. human text
+- Quality assurance for text generation systems
+- Identifying awkward or unnatural phrasing
+- Comparing different language models or prompts
+- Spam/gibberish detection
+
+**Not suitable for:**
+- Measuring factual accuracy (perplexity doesn't understand truth)
+- Evaluating creative writing (may penalize intentional unusual language)
+- Domain-specific jargon (model may not know specialized terms)
+- Non-English text (unless using appropriate model)
+- Translation quality (use BLEU/TER/BERTScore instead)
+
+### Performance Notes
+
+**First call only:**
+- Downloads ONNX model from Hugging Face (~150MB for DistilGPT-2)
+- Caches to local disk: `~/.cache/huggingface/transformers/`
+- Takes 3-8 seconds depending on internet speed
+- One-time download per model
+
+**Every subsequent call:**
+- Loads from local cache (no network required)
+- Runs entirely on your CPU using ONNX Runtime
+- 100-500ms per evaluation (depends on text length)
+- Completely offline - no API calls
+
+**Resource usage:**
+- Memory: ~800MB RAM for DistilGPT-2
+- Disk space: ~150MB per model (cached locally)
+- Network: Only for initial download
+- CPU: Uses all available cores
+
+### Comparison with Other Metrics
+
+| Metric | Measures | Requires Reference | Speed | Use Case |
+|--------|----------|-------------------|-------|----------|
+| **BLEU** | Lexical overlap | ✅ Yes | ⚡⚡⚡ Fast | Translation quality |
+| **TER** | Edit distance | ✅ Yes | ⚡⚡⚡ Fast | Post-editing effort |
+| **BERTScore** | Semantic similarity | ✅ Yes | ⚡ Moderate | Paraphrase quality |
+| **Coherence** | Topic continuity | ❌ No | ⚡⚡⚡ Fast | Text flow |
+| **Perplexity** | Language fluency | ❌ No | ⚡ Moderate | Natural language |
+
+### Best Practice: Combine Metrics
+
+For comprehensive AI text evaluation, use perplexity WITH coherence:
+
+```typescript
+import { calculatePerplexity, calculateCoherence } from 'eval-kit';
+
+async function evaluateAIText(text: string) {
+  const [perplexity, coherence] = await Promise.all([
+    calculatePerplexity(text),
+    Promise.resolve(calculateCoherence(text))
+  ]);
+
+  return {
+    fluency: perplexity.score,        // How natural is the language?
+    coherence: coherence.score,       // How well do sentences connect?
+    perplexity: perplexity.perplexity,
+    overall: (perplexity.score * 0.5 + coherence.score * 0.5)
+  };
+}
+```
+
+### Interpreting Combined Scores
+
+| Perplexity | Coherence | Interpretation |
+|------------|-----------|----------------|
+| High | High | Excellent - fluent language with logical flow |
+| Low | High | Unnatural phrasing but logical progression |
+| High | Low | Fluent sentences but poor topic continuity |
+| Low | Low | Poor quality - both fluency and flow issues |
+
+### Reference
+
+This implementation is based on the standard perplexity calculation used in natural language processing research. Perplexity was introduced as a metric for evaluating language models in the 1970s and remains a fundamental measure in NLP today.
