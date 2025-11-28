@@ -9,7 +9,6 @@ import { TemplateRenderer } from "../utils/template-engine.js";
 
 export class Evaluator {
 	readonly name: string;
-	readonly weight: number;
 	readonly timeout?: number;
 
 	private readonly model: EvaluatorConfig["model"];
@@ -20,7 +19,6 @@ export class Evaluator {
 
 	constructor(config: EvaluatorConfig) {
 		this.name = config.name;
-		this.weight = config.weight ?? 1.0;
 		this.timeout = config.timeout;
 
 		this.model = config.model;
@@ -164,7 +162,6 @@ export class Evaluator {
 		options?: {
 			evaluationPrompt?: string;
 			scoreConfig?: EvaluatorConfig["scoreConfig"];
-			weight?: number;
 			timeout?: number;
 			modelSettings?: EvaluatorConfig["modelSettings"];
 			requireReference?: boolean;
@@ -187,7 +184,6 @@ Provide a detailed assessment.`;
 			model,
 			evaluationPrompt: options?.evaluationPrompt ?? defaultEvaluationPrompt,
 			scoreConfig: options?.scoreConfig,
-			weight: options?.weight,
 			timeout: options?.timeout,
 			modelSettings: options?.modelSettings,
 		});

@@ -37,20 +37,6 @@ describe("Evaluator", () => {
 			});
 
 			expect(evaluator.name).toBe("fluency");
-			expect(evaluator.weight).toBe(1.0);
-		});
-
-		it("should use custom weight", () => {
-			const model = createMockModel();
-
-			const evaluator = new Evaluator({
-				name: "accuracy",
-				model,
-				evaluationPrompt: "Evaluate: {{candidateText}}",
-				weight: 2.5,
-			});
-
-			expect(evaluator.weight).toBe(2.5);
 		});
 
 		it("should validate template syntax", () => {
@@ -260,7 +246,6 @@ Candidate: {{candidateText}}
 			const evaluator = Evaluator.create("fluency", model);
 
 			expect(evaluator.name).toBe("fluency");
-			expect(evaluator.weight).toBe(1.0);
 		});
 
 		it("should create evaluator with custom prompt", () => {
@@ -294,16 +279,6 @@ Candidate: {{candidateText}}
 			});
 
 			expect(evaluator.name).toBe("rating");
-		});
-
-		it("should create evaluator with custom weight", () => {
-			const model = createMockModel();
-
-			const evaluator = Evaluator.create("important", model, {
-				weight: 3.0,
-			});
-
-			expect(evaluator.weight).toBe(3.0);
 		});
 
 		it("should create evaluator with timeout", () => {
