@@ -49,7 +49,6 @@ export interface EvaluatorConfig {
 	model: LanguageModel;
 	evaluationPrompt: string;
 	scoreConfig?: ScoreConfig;
-	weight?: number;
 	timeout?: number;
 	modelSettings?: {
 		temperature?: number;
