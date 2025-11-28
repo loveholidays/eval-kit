@@ -37,6 +37,23 @@ export {
 	type PerplexityResult,
 } from "./metrics/perplexity.js";
 
+// Evaluator
+export { Evaluator } from "./evaluators/evaluator.js";
+export type {
+	EvaluatorConfig,
+	EvaluatorResult,
+	EvaluationInput,
+	ScoreConfig,
+	NumericScoreConfig,
+	CategoricalScoreConfig,
+	TokenUsage,
+	ProcessingStats,
+	TemplateVariable,
+} from "./types/evaluator.js";
+
+// Evaluator Utilities
+export { TemplateRenderer } from "./utils/template-engine.js";
+
 // Utilities
 export { tokenizeWords, tokenizeSentences } from "./utils/tokenization.js";
 export {
