@@ -7,6 +7,7 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     'bert-score.spec.ts', // Skip due to @xenova/transformers ES module issues
+    'perplexity.spec.ts', // Skip due to @xenova/transformers ES module issues
   ],
   collectCoverageFrom: [
     'src/**/*.ts',
