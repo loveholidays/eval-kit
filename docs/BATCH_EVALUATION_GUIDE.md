@@ -92,22 +92,51 @@ Rate from 1-10.`,
   scoreConfig: { type: "numeric", min: 1, max: 10 },
 });
 
-// Input data - contains the content and optional generation prompt
+// Input data - contains the content to evaluate
 const inputs = [
   {
     candidateText: "Bonjour",
     referenceText: "Hello",
-    prompt: "Translate 'Hello' to French",  // Optional: what generated this
   },
   {
     candidateText: "Guten Tag",
     referenceText: "Good day",
-    prompt: "Translate 'Good day' to German",  // Optional: what generated this
   },
 ];
+
+// To include the generation prompt, add it to BatchEvaluatorConfig.defaultInput:
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [evaluator],
+  defaultInput: {
+    prompt: "Translate the source text",  // Applied to all rows
+  },
+});
 ```
 
-**In most cases**, you only need the `candidateText` in your input data. The `prompt` field is optional metadata that can provide context about how the content was generated.
+**In most cases**, you only need the `candidateText` (and optionally `referenceText`) in your input data. The generation prompt should be specified in `defaultInput` if needed for context.
+
+### Using Default Input for Common Values
+
+If all your rows share the same generation prompt (or other common fields), you can specify it once in the `BatchEvaluatorConfig` instead of repeating it in every row:
+
+```typescript
+// All rows were generated with the same prompt
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [evaluator],
+  concurrency: 5,
+  defaultInput: {
+    prompt: "Translate the following text to French",  // Applied to all rows
+    contentType: "translation",
+  },
+});
+
+// Input CSV only needs the varying content
+// candidateText,referenceText
+// "Bonjour","Hello"
+// "Merci","Thank you"
+```
+
+The `defaultInput` fields are merged with each row's data. If a row specifies its own value for a field, it overrides the default.
 
 ---
 
@@ -119,10 +148,9 @@ Your input data contains the **content to be evaluated**, not the evaluation cri
 
 - **`candidateText`** (required) - The text output you want to evaluate
 - **`referenceText`** (optional) - Ground truth or expected output for comparison
-- **`prompt`** (optional) - The original prompt that was used to generate the candidateText (for context/metadata only)
 - **`id`** (optional) - Unique identifier for tracking
 
-**Important:** The `prompt` field in your input data is **not** the evaluation prompt. It's metadata about what prompt was used to generate the content. The evaluation criteria come from the `evaluationPrompt` in your Evaluator config.
+**Important:** The generation prompt (what prompt was used to generate the content) should be specified in `BatchEvaluatorConfig.defaultInput.prompt`, not in your input file. This avoids repetition when all rows share the same generation prompt.
 
 ### CSV Files
 
@@ -141,11 +169,11 @@ candidateText,referenceText
 "Bonjour le monde","Hello world"
 ```
 
-**With full metadata (including generation prompt):**
+**With additional metadata:**
 ```csv
-id,candidateText,referenceText,prompt
-1,"Bonjour le monde","Hello world","Translate 'Hello world' to French"
-2,"Guten Tag","Good day","Translate 'Good day' to German"
+id,candidateText,referenceText,sourceText,language
+1,"Bonjour le monde","Hello world","Hello world","French"
+2,"Guten Tag","Good day","Good day","German"
 ```
 
 ### JSON Files
@@ -176,20 +204,22 @@ id,candidateText,referenceText,prompt
 ]
 ```
 
-**With full metadata:**
+**With additional metadata:**
 ```json
 [
   {
     "id": "1",
     "candidateText": "Bonjour le monde",
     "referenceText": "Hello world",
-    "prompt": "Translate 'Hello world' to French"
+    "sourceText": "Hello world",
+    "language": "French"
   },
   {
     "id": "2",
     "candidateText": "Guten Tag",
     "referenceText": "Good day",
-    "prompt": "Translate 'Good day' to German"
+    "sourceText": "Good day",
+    "language": "German"
   }
 ]
 ```
@@ -230,7 +260,7 @@ await batchEvaluator.evaluate({
   fieldMapping: {
     candidateText: "output_text",  // Map "output_text" column to candidateText
     referenceText: "expected",      // Map "expected" column to referenceText
-    prompt: "instruction",          // Map "instruction" column to prompt
+    sourceText: "input",            // Map "input" column to sourceText
   }
 });
 ```
@@ -631,6 +661,16 @@ interface BatchEvaluatorConfig {
   // Required
   evaluators: Evaluator[];
 
+  // Default input values applied to all rows (optional)
+  defaultInput?: {
+    prompt?: string;         // Default generation prompt
+    referenceText?: string;  // Default reference text
+    sourceText?: string;     // Default source text
+    contentType?: string;    // Default content type
+    language?: string;       // Default language
+    [key: string]: unknown;  // Additional default fields
+  };
+
   // Concurrency control (optional)
   concurrency?: number;  // Default: 5
   evaluatorExecutionMode?: "parallel" | "sequential";  // Default: "parallel"
@@ -690,7 +730,6 @@ interface BatchInputConfig {
   // Field mapping
   fieldMapping?: {
     candidateText: string;  // Required
-    prompt?: string;
     referenceText?: string;
     sourceText?: string;
     contentType?: string;
