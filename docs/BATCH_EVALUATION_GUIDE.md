@@ -5,6 +5,8 @@ This guide explains how to run evaluations on multiple inputs at once using the 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Key Concepts](#key-concepts)
+  - [Evaluation Prompt vs Generation Prompt](#evaluation-prompt-vs-generation-prompt)
 - [Input Formats](#input-formats)
 - [Basic Usage](#basic-usage)
 - [Export Options](#export-options)
@@ -61,38 +63,133 @@ console.log(`Success rate: ${(result.successfulRows / result.totalRows * 100).to
 
 ---
 
+## Key Concepts
+
+### Evaluation Prompt vs Generation Prompt
+
+It's important to understand the difference between two types of prompts:
+
+**Evaluation Prompt** (in Evaluator config)
+- Defines **how to evaluate** the content
+- Tells the AI what criteria to use
+- Same for all rows in the batch
+- Example: "Rate the translation quality from 1-10"
+
+**Generation Prompt** (in input data)
+- Describes **what prompt generated** the content
+- Optional metadata for context
+- Can be different for each row
+- Example: "Translate 'Hello' to French"
+
+```typescript
+// Evaluation prompt - defines the evaluation criteria (same for all)
+const evaluator = new Evaluator({
+  name: "translation-quality",
+  model: anthropic("claude-3-5-haiku-20241022"),
+  evaluationPrompt: `Evaluate the translation quality.
+Consider accuracy, fluency, and naturalness.
+Rate from 1-10.`,
+  scoreConfig: { type: "numeric", min: 1, max: 10 },
+});
+
+// Input data - contains the content and optional generation prompt
+const inputs = [
+  {
+    candidateText: "Bonjour",
+    referenceText: "Hello",
+    prompt: "Translate 'Hello' to French",  // Optional: what generated this
+  },
+  {
+    candidateText: "Guten Tag",
+    referenceText: "Good day",
+    prompt: "Translate 'Good day' to German",  // Optional: what generated this
+  },
+];
+```
+
+**In most cases**, you only need the `candidateText` in your input data. The `prompt` field is optional metadata that can provide context about how the content was generated.
+
+---
+
 ## Input Formats
+
+### Understanding Input Fields
+
+Your input data contains the **content to be evaluated**, not the evaluation criteria:
+
+- **`candidateText`** (required) - The text output you want to evaluate
+- **`referenceText`** (optional) - Ground truth or expected output for comparison
+- **`prompt`** (optional) - The original prompt that was used to generate the candidateText (for context/metadata only)
+- **`id`** (optional) - Unique identifier for tracking
+
+**Important:** The `prompt` field in your input data is **not** the evaluation prompt. It's metadata about what prompt was used to generate the content. The evaluation criteria come from the `evaluationPrompt` in your Evaluator config.
 
 ### CSV Files
 
-Your CSV file should have a `candidateText` column (required) and optional columns:
-
-**Example: `inputs.csv`**
+**Minimal example (just the content to evaluate):**
 ```csv
-id,candidateText,prompt,referenceText
-1,"Hello world","Translate to French","Bonjour le monde"
-2,"Good morning","Translate to French","Bonjour"
-3,"Thank you","Translate to French","Merci"
+candidateText
+"The cat sits on the mat"
+"Bonjour le monde"
+"The weather is nice today"
+```
+
+**With reference text for comparison:**
+```csv
+candidateText,referenceText
+"The cat sits on the mat","The cat is sitting on the mat"
+"Bonjour le monde","Hello world"
+```
+
+**With full metadata (including generation prompt):**
+```csv
+id,candidateText,referenceText,prompt
+1,"Bonjour le monde","Hello world","Translate 'Hello world' to French"
+2,"Guten Tag","Good day","Translate 'Good day' to German"
 ```
 
 ### JSON Files
 
-Your JSON file should be an array of objects:
+**Minimal example:**
+```json
+[
+  {
+    "candidateText": "The cat sits on the mat"
+  },
+  {
+    "candidateText": "Bonjour le monde"
+  }
+]
+```
 
-**Example: `inputs.json`**
+**With reference text:**
+```json
+[
+  {
+    "candidateText": "The cat sits on the mat",
+    "referenceText": "The cat is sitting on the mat"
+  },
+  {
+    "candidateText": "Bonjour le monde",
+    "referenceText": "Hello world"
+  }
+]
+```
+
+**With full metadata:**
 ```json
 [
   {
     "id": "1",
-    "candidateText": "Hello world",
-    "prompt": "Translate to French",
-    "referenceText": "Bonjour le monde"
+    "candidateText": "Bonjour le monde",
+    "referenceText": "Hello world",
+    "prompt": "Translate 'Hello world' to French"
   },
   {
     "id": "2",
-    "candidateText": "Good morning",
-    "prompt": "Translate to French",
-    "referenceText": "Bonjour"
+    "candidateText": "Guten Tag",
+    "referenceText": "Good day",
+    "prompt": "Translate 'Good day' to German"
   }
 ]
 ```
@@ -144,6 +241,8 @@ await batchEvaluator.evaluate({
 
 ### 1. Create Your Evaluator
 
+Define **how** to evaluate the content. This evaluation prompt is the same for all rows:
+
 ```typescript
 import { anthropic } from "@ai-sdk/anthropic";
 import { Evaluator } from "eval-kit";
@@ -151,13 +250,14 @@ import { Evaluator } from "eval-kit";
 const evaluator = new Evaluator({
   name: "translation-quality",
   model: anthropic("claude-3-5-haiku-20241022"),
-  evaluationPrompt: `Rate the translation quality from 1-10.
+  // This evaluation prompt defines the criteria (same for all rows)
+  evaluationPrompt: `Evaluate the translation quality.
 
-Source: {{sourceText}}
-Translation: {{candidateText}}
-Reference: {{referenceText}}
+Candidate: {{candidateText}}
+{{#if referenceText}}Reference: {{referenceText}}{{/if}}
+{{#if prompt}}Context: {{prompt}}{{/if}}
 
-Consider accuracy, fluency, and completeness.`,
+Consider accuracy, fluency, and naturalness. Rate from 1-10.`,
   scoreConfig: {
     type: "numeric",
     min: 1,
@@ -166,6 +266,8 @@ Consider accuracy, fluency, and completeness.`,
   },
 });
 ```
+
+**Note:** You can use `{{prompt}}` in your evaluation prompt to include the generation prompt as context, but it's optional.
 
 ### 2. Create Batch Evaluator
 
@@ -638,7 +740,68 @@ interface BatchExportConfig {
 
 ## Examples
 
-### Example 1: Translation Quality Check
+### Example 1: Evaluating LLM Outputs (Common Case)
+
+Most commonly, you'll be evaluating multiple outputs that were all generated with the same prompt. In this case, the generation prompt is not needed in your input data:
+
+**Input file: `llm-outputs.csv`**
+```csv
+id,candidateText
+1,"The quick brown fox jumps over the lazy dog."
+2,"To be or not to be, that is the question."
+3,"In a galaxy far, far away..."
+```
+
+**Evaluation code:**
+```typescript
+import { anthropic } from "@ai-sdk/anthropic";
+import { BatchEvaluator, Evaluator } from "eval-kit";
+
+// Define how to evaluate (same criteria for all)
+const grammarEvaluator = new Evaluator({
+  name: "grammar-check",
+  model: anthropic("claude-3-5-haiku-20241022"),
+  evaluationPrompt: `Evaluate the grammar and writing quality.
+
+Text: {{candidateText}}
+
+Rate from 1-10 considering:
+- Grammar correctness
+- Sentence structure
+- Clarity
+
+Provide a score and brief feedback.`,
+  scoreConfig: { type: "numeric", min: 1, max: 10 },
+});
+
+// Run batch evaluation
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [grammarEvaluator],
+  concurrency: 5,
+});
+
+const result = await batchEvaluator.evaluate({
+  filePath: "./llm-outputs.csv",
+  format: "csv",
+});
+
+await batchEvaluator.export({
+  format: "csv",
+  destination: "./grammar-scores.csv",
+});
+
+console.log(`Evaluated ${result.totalRows} outputs`);
+```
+
+**Result: `grammar-scores.csv`**
+```csv
+rowId,candidateText,evaluatorName,score,feedback
+1,"The quick brown fox...","grammar-check",9,"Excellent grammar and clarity"
+2,"To be or not to be...","grammar-check",10,"Perfect sentence structure"
+3,"In a galaxy far...","grammar-check",8,"Good structure, slightly informal"
+```
+
+### Example 2: Translation Quality Check
 
 ```typescript
 import { anthropic } from "@ai-sdk/anthropic";
