@@ -18,6 +18,14 @@ A comprehensive TypeScript SDK for evaluating content quality using both traditi
 - **Type-Safe Responses** - Zod schema validation for structured output
 - **Processing Stats** - Track execution time and token usage
 
+### 📦 Batch Evaluation System
+- **CSV/JSON Input** - Process evaluations from structured data files
+- **Concurrent Execution** - Configurable concurrency with rate limiting
+- **Progress Tracking** - Real-time progress with ETA and cost estimation
+- **Multiple Export Formats** - Export to CSV, JSON, or webhooks
+- **Streaming Export** - Save results immediately as they complete
+- **Fault Tolerance** - Resume interrupted batches with state persistence
+
 ## Installation
 
 ```bash
