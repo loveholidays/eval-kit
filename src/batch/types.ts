@@ -33,6 +33,16 @@ export interface BatchEvaluatorConfig {
 	// Evaluators to run on each input
 	readonly evaluators: Evaluator[];
 
+	// Common input fields applied to all rows
+	readonly defaultInput?: {
+		readonly prompt?: string; // Default prompt if not specified in input row
+		readonly referenceText?: string; // Default reference text
+		readonly sourceText?: string; // Default source text
+		readonly contentType?: string; // Default content type
+		readonly language?: string; // Default language
+		readonly [key: string]: unknown; // Allow additional default fields
+	};
+
 	// Concurrency control
 	readonly concurrency?: number; // Default: 5
 	readonly evaluatorExecutionMode?: "parallel" | "sequential"; // Default: 'parallel'
@@ -91,9 +101,9 @@ export interface BatchInputConfig {
 	};
 
 	// Field mapping (map file columns to EvaluationInput fields)
+	// Note: 'prompt' is not included here - use BatchEvaluatorConfig.defaultInput.prompt instead
 	readonly fieldMapping?: {
 		readonly candidateText: string; // Required
-		readonly prompt?: string;
 		readonly referenceText?: string;
 		readonly sourceText?: string;
 		readonly contentType?: string;

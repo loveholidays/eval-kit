@@ -203,12 +203,19 @@ export class BatchEvaluator {
 			let retryCount = 0;
 			const maxRetries = this.config.retryConfig?.maxRetries ?? 3;
 
+			// Merge default input fields with row data
+			// Row data takes precedence over defaults
+			const inputData: BatchInputRow = {
+				...this.config.defaultInput,
+				...row,
+			};
+
 			// Loop allows: 1 initial attempt + maxRetries retry attempts
 			// With maxRetries=3: attempts at retryCount 0,1,2,3 = 4 total attempts
 			while (true) {
 				try {
 					// Run evaluators
-					const evaluatorResults = await this.runEvaluators(row);
+					const evaluatorResults = await this.runEvaluators(inputData);
 
 					// Calculate duration
 					const durationMs = Date.now() - startTime;
@@ -219,11 +226,11 @@ export class BatchEvaluator {
 						0,
 					);
 
-					// Create result
+					// Create result (use merged inputData so defaults are included)
 					const result: BatchEvaluationResult = {
 						rowId,
 						rowIndex: index,
-						input: row,
+						input: inputData,
 						results: evaluatorResults,
 						timestamp: new Date().toISOString(),
 						durationMs,

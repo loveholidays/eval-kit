@@ -51,14 +51,6 @@ export class JsonParser {
 				id = `row-${index}`;
 			}
 
-			let prompt: string | undefined;
-			if (fieldMapping?.prompt) {
-				const value = this.getOptionalField(record, fieldMapping.prompt);
-				if (value) prompt = String(value);
-			} else if (record.prompt) {
-				prompt = String(record.prompt);
-			}
-
 			let referenceText: string | undefined;
 			if (fieldMapping?.referenceText) {
 				const value = this.getOptionalField(record, fieldMapping.referenceText);
@@ -95,7 +87,6 @@ export class JsonParser {
 			const row: BatchInputRow = {
 				candidateText,
 				id,
-				...(prompt && { prompt }),
 				...(referenceText && { referenceText }),
 				...(sourceText && { sourceText }),
 				...(contentType && { contentType }),
