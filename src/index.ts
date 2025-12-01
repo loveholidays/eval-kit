@@ -54,6 +54,20 @@ export type {
 // Evaluator Utilities
 export { TemplateRenderer } from "./utils/template-engine.js";
 
+// Batch Evaluation
+export { BatchEvaluator } from "./batch/batch-evaluator.js";
+export type {
+	BatchEvaluatorConfig,
+	BatchInputConfig,
+	BatchExportConfig,
+	BatchInputRow,
+	BatchEvaluationResult,
+	BatchResult,
+	BatchState,
+	ProgressEvent,
+	ProgressEventType,
+} from "./batch/types.js";
+
 // Utilities
 export { tokenizeWords, tokenizeSentences } from "./utils/tokenization.js";
 export {
