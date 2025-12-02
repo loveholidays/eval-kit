@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Evaluator } from "../evaluators/evaluator.js";
-import type { EvaluatorResult } from "../types/evaluator.js";
+import type { EvaluatorResult, IEvaluator } from "../types/evaluator.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { CsvExporter } from "./exporters/csv-exporter.js";
 import { JsonExporter } from "./exporters/json-exporter.js";
@@ -22,7 +21,7 @@ import type {
 
 export class BatchEvaluator {
 	private readonly config: BatchEvaluatorConfig;
-	private readonly evaluators: Evaluator[];
+	private readonly evaluators: IEvaluator[];
 	private readonly concurrencyManager: ConcurrencyManager;
 	private stateManager?: StateManager;
 	private progressTracker?: ProgressTracker;
@@ -340,7 +339,7 @@ export class BatchEvaluator {
 
 		// Apply timeout if configured
 		const timeout = this.config.timeout;
-		const evaluateWithTimeout = async (evaluator: Evaluator) => {
+		const evaluateWithTimeout = async (evaluator: IEvaluator) => {
 			if (timeout) {
 				return Promise.race([
 					evaluator.evaluate(input),
