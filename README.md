@@ -26,6 +26,11 @@ A comprehensive TypeScript SDK for evaluating content quality using both traditi
 - **Streaming Export** - Save results immediately as they complete
 - **Fault Tolerance** - Resume interrupted batches with state persistence
 
+### 📝 Pre-Built Templates
+- **Translation Quality** - Comprehensive multi-dimensional translation evaluation
+- **Translation Adequacy** - Semantic accuracy evaluation
+- **Translation Fluency** - Target language quality evaluation
+
 ## Installation
 
 ```bash
@@ -136,11 +141,38 @@ const result = await evaluator.evaluate({
 console.log(result.score); // 'excellent'
 ```
 
+### Using Pre-Built Templates
+
+```typescript
+import { anthropic } from '@ai-sdk/anthropic';
+import { createTranslationEvaluator } from 'eval-kit';
+
+// Create a translation quality evaluator
+const evaluator = createTranslationEvaluator({
+  model: anthropic('claude-3-5-haiku-20241022'),
+  targetLanguage: 'French',
+  sourceLanguage: 'English',
+});
+
+// Evaluate a translation
+const result = await evaluator.evaluate({
+  candidateText: 'Bonjour le monde',
+  referenceText: 'Hello world',
+  sourceText: 'Hello world',
+});
+
+console.log(result.score); // 95.5
+console.log(result.feedback); // Detailed evaluation across 5 dimensions
+```
+
 ## Documentation
 
 ### Comprehensive Guides
 - **[Metrics Documentation](./docs/METRICS.md)** - Detailed guide for all traditional metrics (BLEU, TER, BERTScore, Coherence, Perplexity)
 - **[Evaluator Documentation](./docs/EVALUATOR.md)** - Complete guide for AI-powered evaluation with examples
+- **[Translation Template](./docs/TEMPLATE_TRANSLATION.md)** - Production-ready translation quality evaluation template
+- **[Batch Evaluation Guide](./docs/BATCH_EVALUATION_GUIDE.md)** - Complete guide for batch processing
+- **[Export Guide](./docs/EXPORT_GUIDE.md)** - Export results to CSV, JSON, or webhooks
 
 ### Core Concepts
 
