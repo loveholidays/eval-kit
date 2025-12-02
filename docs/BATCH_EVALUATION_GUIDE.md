@@ -640,6 +640,52 @@ const result = await resumedEvaluator.evaluate({
 });
 ```
 
+#### Simple Resume with startIndex
+
+For a simpler resume approach when using streaming export (CSV), use `startIndex` to skip already-processed rows:
+
+```typescript
+// Initial run - interrupted at row 500
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [myEvaluator],
+  concurrency: 5,
+  streamExport: {
+    format: "csv",
+    destination: "./results.csv",
+  },
+});
+
+await batchEvaluator.evaluate({
+  filePath: "./inputs.json",
+});
+// Process interrupted... results.csv has 500 rows
+
+// Resume from row 500 (0-indexed)
+const resumeEvaluator = new BatchEvaluator({
+  evaluators: [myEvaluator],
+  concurrency: 5,
+  streamExport: {
+    format: "csv",
+    destination: "./results.csv",
+    appendToExisting: true,  // Append to existing file instead of overwriting
+  },
+});
+
+await resumeEvaluator.evaluate({
+  filePath: "./inputs.json",
+  startIndex: 500,  // Skip first 500 rows (already processed)
+});
+```
+
+**Key options for simple resume:**
+
+| Option | Location | Description |
+|--------|----------|-------------|
+| `startIndex` | `BatchInputConfig` | Skip rows before this index (0-based) |
+| `appendToExisting` | `BatchExportConfig` | Append to existing CSV instead of overwriting |
+
+**Tip:** Check your partial results file to find the last `rowIndex` value, then use `startIndex = lastRowIndex + 1`.
+
 ### Multiple Evaluators
 
 Run multiple evaluators on each input:
@@ -765,6 +811,9 @@ interface BatchInputConfig {
   filePath: string;
   format?: "csv" | "json" | "auto";  // Default: "auto" (detect from extension)
 
+  // Resume support
+  startIndex?: number;  // Skip rows before this index (0-based)
+
   // CSV options
   csvOptions?: {
     delimiter?: string;      // Default: ","
@@ -799,6 +848,9 @@ interface BatchInputConfig {
 interface BatchExportConfig {
   format: "csv" | "json" | "webhook";
   destination: string;  // File path or webhook URL
+
+  // Resume support
+  appendToExisting?: boolean;  // Append to existing file instead of overwriting (default: false)
 
   // CSV options
   csvOptions?: {
