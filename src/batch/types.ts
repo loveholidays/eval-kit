@@ -1,7 +1,7 @@
-import type { Evaluator } from "../evaluators/evaluator.js";
 import type {
 	EvaluationInput,
 	EvaluatorResult,
+	IEvaluator,
 } from "../types/evaluator.js";
 
 /**
@@ -31,7 +31,7 @@ export interface BatchEvaluationResult {
  */
 export interface BatchEvaluatorConfig {
 	// Evaluators to run on each input
-	readonly evaluators: Evaluator[];
+	readonly evaluators: IEvaluator[];
 
 	// Common input fields applied to all rows
 	readonly defaultInput?: {

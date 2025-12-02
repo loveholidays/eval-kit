@@ -9,6 +9,7 @@ export {
 	createTranslationAdequacyEvaluator,
 	createTranslationFluencyEvaluator,
 	type TranslationEvaluatorOptions,
+	type TranslationEvaluatorResult,
 } from "./translation.js";
 
 export {

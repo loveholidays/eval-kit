@@ -70,3 +70,13 @@ export interface EvaluationInput {
 	readonly contentType?: string;
 	readonly language?: string;
 }
+
+/**
+ * Common interface for all evaluators
+ * Both Evaluator class and composite evaluators implement this
+ */
+export interface IEvaluator {
+	readonly name: string;
+	readonly timeout?: number;
+	evaluate(input: EvaluationInput): Promise<EvaluatorResult>;
+}
