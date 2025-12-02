@@ -102,6 +102,15 @@ export function createTranslationEvaluator(
 		style: weights.style ?? 0.1,
 	};
 
+	// Validate weights sum to approximately 1.0
+	const totalWeight = Object.values(w).reduce((sum, val) => sum + val, 0);
+	if (Math.abs(totalWeight - 1) > 0.01) {
+		console.warn(
+			`[eval-kit] Translation evaluator weights sum to ${totalWeight.toFixed(2)}, expected 1.0. ` +
+				"Scores may not reflect intended criteria importance.",
+		);
+	}
+
 	const minScore = scoreConfig.min ?? 0;
 	const maxScore = scoreConfig.max ?? 100;
 
