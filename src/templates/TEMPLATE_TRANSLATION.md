@@ -1,14 +1,14 @@
 # Translation Quality Evaluation Template
 
-Production-ready template for evaluating translation quality using AI-powered evaluation.
+Production-ready template for evaluating translation quality using a combination of lexical metrics and AI-powered evaluation.
 
 ## Overview
 
 The translation template provides three specialized evaluators:
 
-1. **Translation Quality Evaluator** - Comprehensive multi-dimensional evaluation
-2. **Translation Adequacy Evaluator** - Semantic accuracy only
-3. **Translation Fluency Evaluator** - Target language quality only
+1. **Translation Quality Evaluator** - Composite evaluation combining BLEU, TER, and AI metrics
+2. **Translation Adequacy Evaluator** - Semantic accuracy only (AI-based)
+3. **Translation Fluency Evaluator** - Target language quality only (AI-based)
 
 ## Quick Start
 
@@ -28,23 +28,32 @@ const result = await evaluator.evaluate({
   sourceText: "Hello world",
 });
 
-console.log(result.score); // 95.5
-console.log(result.feedback); // Detailed evaluation
+console.log(result.score); // 85.5 (composite score)
+console.log(result.metrics); // Detailed breakdown
+console.log(result.feedback); // Comprehensive evaluation
 ```
 
 ## Translation Quality Evaluator
 
-Comprehensive evaluation across five dimensions.
+Composite evaluation combining multiple metrics for robust assessment.
 
-### Evaluation Criteria
+### Metrics Used
 
-| Criterion | Default Weight | Description |
-|-----------|---------------|-------------|
-| **Accuracy** | 35% | Semantic correctness and completeness |
-| **Fluency** | 25% | Natural expression in target language |
-| **Grammar** | 15% | Grammatical correctness |
-| **Terminology** | 15% | Domain-specific term appropriateness |
-| **Style** | 10% | Tone and register preservation |
+| Metric | Default Weight | Description |
+|--------|---------------|-------------|
+| **BLEU** | 25% | N-gram precision - measures lexical overlap with reference |
+| **TER** | 25% | Translation Edit Rate (inverted) - measures edit distance |
+| **AI** | 50% | LLM-based semantic evaluation - captures meaning, fluency, style |
+
+### Why Multiple Metrics?
+
+Each metric captures different aspects of translation quality:
+
+- **BLEU**: Fast, deterministic, good for lexical similarity. But misses semantic equivalence (synonyms score poorly).
+- **TER**: Captures structural differences, but can penalize valid paraphrasing.
+- **AI Evaluation**: Understands meaning, fluency, and style that lexical metrics miss.
+
+Combining them provides more robust and reliable scores than any single metric alone.
 
 ### Basic Usage
 
@@ -57,25 +66,51 @@ const evaluator = createTranslationEvaluator({
 
 const result = await evaluator.evaluate({
   candidateText: "Hola mundo",
-  sourceText: "Hello world",
+  referenceText: "Hello world",
 });
 ```
 
-### Custom Weights
+### Result Structure
 
-Adjust the importance of each criterion:
+```typescript
+interface TranslationEvaluatorResult {
+  evaluatorName: string;
+  score: number;           // Weighted composite score (0-100)
+  feedback: string;        // Comprehensive markdown feedback
+  success: boolean;
+  metrics?: {
+    bleu: {
+      score: number;       // 0-100
+      precisions: number[];// N-gram precisions
+      brevityPenalty: number;
+    };
+    ter: {
+      score: number;       // 0-100 (inverted TER)
+      rawTer: number;      // Original TER value
+      editCount: number;
+      feedback: string;
+    };
+    ai: {
+      score: number;       // 0-100
+      feedback: string;
+    };
+  };
+}
+```
+
+### Custom Metric Weights
+
+Adjust the importance of each metric:
 
 ```typescript
 const evaluator = createTranslationEvaluator({
   model: anthropic("claude-3-5-haiku-20241022"),
   targetLanguage: "Spanish",
   sourceLanguage: "English",
-  weights: {
-    accuracy: 0.5,      // 50% - Prioritize accuracy
-    fluency: 0.2,       // 20%
-    grammar: 0.15,      // 15%
-    terminology: 0.1,   // 10%
-    style: 0.05,        // 5%
+  metricWeights: {
+    bleu: 0.2,    // 20% - Less weight on lexical overlap
+    ter: 0.2,     // 20%
+    ai: 0.6,      // 60% - More weight on semantic quality
   },
 });
 ```
@@ -97,12 +132,12 @@ const evaluator = createTranslationEvaluator({
 
 ### With Reference Translation
 
-Provide a reference translation for comparison:
+Reference text is required for BLEU and TER metrics:
 
 ```typescript
 const result = await evaluator.evaluate({
   candidateText: "Bonjour le monde",
-  referenceText: "Hello world",
+  referenceText: "Hello world",  // Required for lexical metrics
   sourceText: "Hello world",
 });
 ```
@@ -114,14 +149,14 @@ Include the prompt used to generate the translation:
 ```typescript
 const result = await evaluator.evaluate({
   candidateText: "Bonjour le monde",
-  sourceText: "Hello world",
+  referenceText: "Hello world",
   prompt: "Translate to French in a formal style",
 });
 ```
 
 ## Translation Adequacy Evaluator
 
-Evaluates **semantic accuracy only**, ignoring fluency, grammar, and style.
+Evaluates **semantic accuracy only**, ignoring fluency, grammar, and style. Uses AI evaluation only (no lexical metrics).
 
 ### When to Use
 
@@ -150,7 +185,7 @@ console.log(result.score); // High score despite poor fluency
 
 ## Translation Fluency Evaluator
 
-Evaluates **target language quality only**, without comparing to source.
+Evaluates **target language quality only**, without comparing to source. Uses AI evaluation only.
 
 ### When to Use
 
@@ -212,7 +247,7 @@ await batchEvaluator.export({
 ### Input CSV Format
 
 ```csv
-candidateText,sourceText,referenceText
+candidateText,referenceText,sourceText
 "Bonjour","Hello","Hello"
 "Merci","Thanks","Thank you"
 "Au revoir","Bye","Goodbye"
@@ -250,29 +285,27 @@ const result = await batchEvaluator.evaluate({
 
 ### `createTranslationEvaluator(options)`
 
-Creates a comprehensive translation quality evaluator.
+Creates a composite translation quality evaluator combining BLEU, TER, and AI metrics.
 
 **Parameters:**
 
-- `model` (LanguageModel, required) - The LLM to use for evaluation
+- `model` (LanguageModel, required) - The LLM to use for AI evaluation
 - `targetLanguage` (string, required) - Target language name (e.g., "French")
 - `sourceLanguage` (string, optional) - Source language name
-- `weights` (object, optional) - Custom criterion weights
-  - `accuracy` (number, 0-1) - Default: 0.35
-  - `fluency` (number, 0-1) - Default: 0.25
-  - `grammar` (number, 0-1) - Default: 0.15
-  - `terminology` (number, 0-1) - Default: 0.15
-  - `style` (number, 0-1) - Default: 0.10
+- `metricWeights` (object, optional) - Custom metric weights
+  - `bleu` (number, 0-1) - Default: 0.25
+  - `ter` (number, 0-1) - Default: 0.25
+  - `ai` (number, 0-1) - Default: 0.50
 - `scoreConfig` (object, optional) - Score range configuration
   - `min` (number) - Default: 0
   - `max` (number) - Default: 100
 - `modelSettings` (object, optional) - Model-specific settings
 
-**Returns:** `Evaluator`
+**Returns:** `CompositeTranslationEvaluator`
 
 ### `createTranslationAdequacyEvaluator(options)`
 
-Creates a semantic accuracy evaluator.
+Creates a semantic accuracy evaluator (AI-based only).
 
 **Parameters:**
 
@@ -286,7 +319,7 @@ Creates a semantic accuracy evaluator.
 
 ### `createTranslationFluencyEvaluator(options)`
 
-Creates a target language fluency evaluator.
+Creates a target language fluency evaluator (AI-based only).
 
 **Parameters:**
 
@@ -302,7 +335,7 @@ Creates a target language fluency evaluator.
 ### 1. Choose the Right Evaluator
 
 ```typescript
-// General purpose - use comprehensive evaluator
+// General purpose - use composite evaluator (recommended)
 const general = createTranslationEvaluator({...});
 
 // Comparing MT systems - use adequacy evaluator
@@ -312,21 +345,16 @@ const adequacy = createTranslationAdequacyEvaluator({...});
 const fluency = createTranslationFluencyEvaluator({...});
 ```
 
-### 2. Provide Context When Available
+### 2. Always Provide Reference Text
+
+The composite evaluator requires reference text for BLEU and TER metrics:
 
 ```typescript
-// With reference translation (recommended)
+// Recommended - with reference translation
 const result = await evaluator.evaluate({
   candidateText: translation,
-  referenceText: goldStandard,
+  referenceText: goldStandard,  // Required for lexical metrics
   sourceText: original,
-});
-
-// With generation prompt
-const result = await evaluator.evaluate({
-  candidateText: translation,
-  sourceText: original,
-  prompt: "Translate to French in a formal style",
 });
 ```
 
@@ -350,29 +378,25 @@ const evaluator = createTranslationEvaluator({
 ### 4. Adjust Weights for Your Use Case
 
 ```typescript
-// Technical documentation - prioritize accuracy
-const technical = createTranslationEvaluator({
+// Prioritize lexical similarity (machine translation comparison)
+const mtEval = createTranslationEvaluator({
   model: anthropic("claude-3-5-haiku-20241022"),
   targetLanguage: "Spanish",
-  weights: {
-    accuracy: 0.4,
-    terminology: 0.3,
-    fluency: 0.15,
-    grammar: 0.1,
-    style: 0.05,
+  metricWeights: {
+    bleu: 0.35,
+    ter: 0.35,
+    ai: 0.30,
   },
 });
 
-// Marketing content - prioritize fluency and style
-const marketing = createTranslationEvaluator({
+// Prioritize semantic quality (creative content)
+const creativeEval = createTranslationEvaluator({
   model: anthropic("claude-3-5-haiku-20241022"),
   targetLanguage: "Spanish",
-  weights: {
-    fluency: 0.35,
-    style: 0.25,
-    accuracy: 0.25,
-    grammar: 0.1,
-    terminology: 0.05,
+  metricWeights: {
+    bleu: 0.15,
+    ter: 0.15,
+    ai: 0.70,
   },
 });
 ```
@@ -398,7 +422,7 @@ const batchEvaluator = new BatchEvaluator({
 See [examples/translation-template.ts](../examples/translation-template.ts) for complete working examples including:
 
 - Basic translation evaluation
-- Custom weights
+- Custom metric weights
 - Adequacy-only evaluation
 - Fluency-only evaluation
 - Batch evaluation
@@ -421,20 +445,25 @@ Approximate costs per evaluation (using Claude 3.5 Haiku):
 - **Batch of 1000**: ~$0.10-0.30
 - **Batch of 10,000**: ~$1.00-3.00
 
+Note: BLEU and TER metrics are computed locally at no additional cost.
+
 Costs vary based on:
 - Source and target text length
-- Whether reference translation is provided
 - Model choice (Haiku vs Sonnet)
 - Amount of feedback generated
 
 ## Troubleshooting
 
-**Low scores for good translations:**
-- Ensure `sourceLanguage` is specified correctly
-- Provide `referenceText` if available
-- Check if weights match your quality criteria
+**Missing reference text error:**
+- The composite evaluator requires `referenceText` for BLEU and TER metrics
+- Provide either `referenceText` or `sourceText` as reference
 
-**Inconsistent scores:**
+**Low BLEU scores for good translations:**
+- BLEU penalizes synonyms and paraphrasing
+- Consider increasing AI weight in `metricWeights`
+- Check if reference translation is appropriate
+
+**Inconsistent AI scores:**
 - Lower model `temperature` for more consistency
 - Use the same model for all evaluations
 - Provide clear context in `prompt` field

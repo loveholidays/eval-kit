@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Evaluator } from "../evaluators/evaluator.js";
-import type { EvaluatorResult } from "../types/evaluator.js";
+import type { EvaluatorResult, IEvaluator } from "../types/evaluator.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { CsvExporter } from "./exporters/csv-exporter.js";
 import { JsonExporter } from "./exporters/json-exporter.js";
@@ -22,7 +21,7 @@ import type {
 
 export class BatchEvaluator {
 	private readonly config: BatchEvaluatorConfig;
-	private readonly evaluators: Evaluator[];
+	private readonly evaluators: IEvaluator[];
 	private readonly concurrencyManager: ConcurrencyManager;
 	private stateManager?: StateManager;
 	private progressTracker?: ProgressTracker;
@@ -58,7 +57,16 @@ export class BatchEvaluator {
 	 */
 	async evaluate(inputConfig: BatchInputConfig): Promise<BatchResult> {
 		// Parse input
-		const rows = await this.parseInput(inputConfig);
+		const allRows = await this.parseInput(inputConfig);
+
+		// Handle startIndex for resuming from a specific position
+		const startIndex = inputConfig.startIndex ?? 0;
+		const rows = startIndex > 0 ? allRows.slice(startIndex) : allRows;
+
+		// Mark rows before startIndex as already processed (for accurate progress tracking)
+		for (let i = 0; i < startIndex; i++) {
+			this.processedRowIndices.add(i);
+		}
 
 		// Resume from previous state if provided
 		if (this.config.resumeFromState) {
@@ -71,13 +79,18 @@ export class BatchEvaluator {
 			await this.streamingExporter.initialize();
 		}
 
-		// Initialize progress tracker
+		// Initialize progress tracker (use total rows for accurate percentage)
 		this.progressTracker = new ProgressTracker({
-			totalRows: rows.length,
+			totalRows: allRows.length,
 			emitInterval: this.config.progressInterval,
 			onProgress: this.config.onProgress,
 		});
 		this.progressTracker.start();
+
+		// Fast-forward progress tracker for skipped rows
+		if (startIndex > 0) {
+			this.progressTracker.skipRows(startIndex);
+		}
 
 		// Initialize state if using state manager
 		if (this.stateManager && !this.config.resumeFromState) {
@@ -87,8 +100,8 @@ export class BatchEvaluator {
 				lastUpdateTime: new Date().toISOString(),
 				inputConfig,
 				evaluatorNames: this.evaluators.map((e) => e.name),
-				totalRows: rows.length,
-				processedRowIndices: [],
+				totalRows: allRows.length,
+				processedRowIndices: Array.from(this.processedRowIndices),
 				results: [],
 				progress: this.progressTracker.getCurrentProgress(),
 			});
@@ -102,7 +115,8 @@ export class BatchEvaluator {
 		for (let i = 0; i < rows.length; i += batchSize) {
 			const batch = rows.slice(i, i + batchSize);
 			const batchPromises = batch.map((row, batchIndex) =>
-				this.processRow(row, i + batchIndex),
+				// Adjust index to account for startIndex offset
+				this.processRow(row, startIndex + i + batchIndex),
 			);
 			await Promise.all(batchPromises);
 		}
@@ -340,7 +354,7 @@ export class BatchEvaluator {
 
 		// Apply timeout if configured
 		const timeout = this.config.timeout;
-		const evaluateWithTimeout = async (evaluator: Evaluator) => {
+		const evaluateWithTimeout = async (evaluator: IEvaluator) => {
 			if (timeout) {
 				return Promise.race([
 					evaluator.evaluate(input),

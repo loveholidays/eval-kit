@@ -19,12 +19,23 @@ export class StreamingExporter {
 	 * Initialize the export destination (e.g., write headers for CSV)
 	 */
 	async initialize(): Promise<void> {
+		const appendMode = this.config.appendToExisting ?? false;
+
 		if (this.config.format === "csv") {
-			// Clear the file if it exists
-			if (existsSync(this.config.destination)) {
-				await writeFile(this.config.destination, "", { encoding: "utf-8" });
+			if (appendMode && existsSync(this.config.destination)) {
+				// Append mode: skip header writing since file already has headers
+				this.csvHeaderWritten = true;
+			} else {
+				// Clear the file if it exists
+				if (existsSync(this.config.destination)) {
+					await writeFile(this.config.destination, "", { encoding: "utf-8" });
+				}
 			}
 		} else if (this.config.format === "json") {
+			if (appendMode && existsSync(this.config.destination)) {
+				// JSON append mode not fully supported - warn and overwrite
+				console.warn("Warning: appendToExisting is not fully supported for JSON format. Use CSV for resume capability.");
+			}
 			// Start JSON array
 			await writeFile(this.config.destination, "[\n", { encoding: "utf-8" });
 		}

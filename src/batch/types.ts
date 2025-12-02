@@ -1,7 +1,7 @@
-import type { Evaluator } from "../evaluators/evaluator.js";
 import type {
 	EvaluationInput,
 	EvaluatorResult,
+	IEvaluator,
 } from "../types/evaluator.js";
 
 /**
@@ -31,7 +31,7 @@ export interface BatchEvaluationResult {
  */
 export interface BatchEvaluatorConfig {
 	// Evaluators to run on each input
-	readonly evaluators: Evaluator[];
+	readonly evaluators: IEvaluator[];
 
 	// Common input fields applied to all rows
 	readonly defaultInput?: {
@@ -84,6 +84,9 @@ export interface BatchInputConfig {
 	readonly filePath: string;
 	readonly format?: "csv" | "json" | "auto"; // Default: 'auto' (detect from extension)
 
+	// Resume support
+	readonly startIndex?: number; // Skip rows before this index (0-based)
+
 	// CSV-specific options
 	readonly csvOptions?: {
 		readonly delimiter?: string; // Default: ','
@@ -118,6 +121,9 @@ export interface BatchInputConfig {
 export interface BatchExportConfig {
 	readonly format: "csv" | "json" | "webhook";
 	readonly destination: string; // File path or webhook URL
+
+	// Resume support
+	readonly appendToExisting?: boolean; // Append to existing file instead of overwriting (default: false)
 
 	// CSV export options
 	readonly csvOptions?: {
