@@ -49,6 +49,7 @@ export type {
 	TokenUsage,
 	ProcessingStats,
 	TemplateVariable,
+	IEvaluator,
 } from "./types/evaluator.js";
 
 // Evaluator Utilities

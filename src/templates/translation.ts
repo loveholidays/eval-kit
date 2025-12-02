@@ -1,6 +1,8 @@
 import type { LanguageModel } from "ai";
 import { Evaluator } from "../evaluators/evaluator.js";
-import type { EvaluatorConfig } from "../types/evaluator.js";
+import type { EvaluatorConfig, EvaluatorResult, EvaluationInput, IEvaluator } from "../types/evaluator.js";
+import { calculateBleu } from "../metrics/bleu.js";
+import { calculateTer } from "../metrics/ter.js";
 
 /**
  * Translation Quality Evaluation Template
@@ -48,16 +50,14 @@ export interface TranslationEvaluatorOptions {
 	sourceLanguage?: string;
 
 	/**
-	 * Evaluation criteria weights (optional)
-	 * Each value should be between 0 and 1
-	 * Default: all criteria weighted equally
+	 * Metric weights for combining scores (optional)
+	 * Each value should be between 0 and 1, summing to 1.0
+	 * Default: BLEU 0.25, TER 0.25, AI 0.50
 	 */
-	weights?: {
-		accuracy?: number; // Default: 0.35
-		fluency?: number; // Default: 0.25
-		grammar?: number; // Default: 0.15
-		terminology?: number; // Default: 0.15
-		style?: number; // Default: 0.10
+	metricWeights?: {
+		bleu?: number; // Default: 0.25
+		ter?: number; // Default: 0.25
+		ai?: number; // Default: 0.50
 	};
 
 	/**
@@ -76,48 +76,184 @@ export interface TranslationEvaluatorOptions {
 }
 
 /**
- * Creates a translation quality evaluator
+ * Extended result type for translation evaluation with detailed metrics
+ */
+export interface TranslationEvaluatorResult extends EvaluatorResult {
+	metrics?: {
+		bleu: {
+			score: number;
+			precisions: number[];
+			brevityPenalty: number;
+		};
+		ter: {
+			score: number;
+			rawTer: number;
+			editCount: number;
+			feedback: string;
+		};
+		ai: {
+			score: number;
+			feedback: string;
+		};
+	};
+}
+
+/**
+ * Composite translation evaluator that combines multiple metrics
+ *
+ * This evaluator combines:
+ * - BLEU score: Measures n-gram overlap with reference translation
+ * - TER score: Measures edit distance (inverted for consistency)
+ * - AI evaluation: Semantic quality assessment using LLM
+ */
+class CompositeTranslationEvaluator implements IEvaluator {
+	readonly name: string;
+	readonly timeout?: number;
+
+	private readonly aiEvaluator: Evaluator;
+	private readonly metricWeights: { bleu: number; ter: number; ai: number };
+
+	constructor(
+		options: TranslationEvaluatorOptions,
+		aiEvaluator: Evaluator,
+	) {
+		const { targetLanguage, metricWeights = {} } = options;
+
+		this.name = `translation-quality-${targetLanguage.toLowerCase().replace(/\s+/g, "-")}`;
+		this.aiEvaluator = aiEvaluator;
+
+		// Normalize metric weights
+		this.metricWeights = {
+			bleu: metricWeights.bleu ?? 0.25,
+			ter: metricWeights.ter ?? 0.25,
+			ai: metricWeights.ai ?? 0.5,
+		};
+
+		// Validate weights sum to approximately 1.0
+		const totalWeight = Object.values(this.metricWeights).reduce((sum, val) => sum + val, 0);
+		if (Math.abs(totalWeight - 1) > 0.01) {
+			console.warn(
+				`[eval-kit] Translation metric weights sum to ${totalWeight.toFixed(2)}, expected 1.0. ` +
+					"Scores may not reflect intended metric importance.",
+			);
+		}
+	}
+
+	async evaluate(input: EvaluationInput): Promise<TranslationEvaluatorResult> {
+		const startTime = Date.now();
+
+		// Reference text is required for BLEU and TER
+		const referenceText = input.referenceText || input.sourceText || "";
+
+		if (!referenceText) {
+			return {
+				evaluatorName: this.name,
+				score: 0,
+				feedback: "Reference text is required for translation evaluation",
+				success: false,
+				error: "Missing reference text",
+				processingStats: { executionTime: Date.now() - startTime },
+			};
+		}
+
+		// Calculate lexical metrics
+		const bleuResult = calculateBleu(input.candidateText, referenceText);
+		const terResult = calculateTer(input.candidateText, referenceText);
+
+		// Run AI evaluation
+		const aiResult = await this.aiEvaluator.evaluate(input);
+
+		// Calculate weighted composite score
+		const aiScore = typeof aiResult.score === "number" ? aiResult.score : 0;
+		const compositeScore =
+			this.metricWeights.bleu * bleuResult.score +
+			this.metricWeights.ter * terResult.score +
+			this.metricWeights.ai * (aiResult.success ? aiScore : 0);
+
+		const executionTime = Date.now() - startTime;
+
+		// Build comprehensive feedback
+		const feedback = this.buildFeedback(bleuResult, terResult, aiScore, aiResult.feedback);
+
+		return {
+			evaluatorName: this.name,
+			score: Math.round(compositeScore * 100) / 100,
+			feedback,
+			success: aiResult.success,
+			error: aiResult.error,
+			processingStats: {
+				executionTime,
+				tokenUsage: aiResult.processingStats?.tokenUsage,
+			},
+			metrics: {
+				bleu: {
+					score: bleuResult.score,
+					precisions: bleuResult.precisions,
+					brevityPenalty: bleuResult.brevityPenalty,
+				},
+				ter: {
+					score: terResult.score,
+					rawTer: terResult.rawTer,
+					editCount: terResult.editCount,
+					feedback: terResult.feedback,
+				},
+				ai: {
+					score: aiScore,
+					feedback: aiResult.feedback,
+				},
+			},
+		};
+	}
+
+	private buildFeedback(
+		bleuResult: { score: number; brevityPenalty: number },
+		terResult: { score: number; feedback: string },
+		aiScore: number,
+		aiFeedback: string,
+	): string {
+		const sections = [
+			`## Lexical Metrics`,
+			`- **BLEU Score**: ${bleuResult.score.toFixed(1)}/100 (brevity penalty: ${bleuResult.brevityPenalty.toFixed(2)})`,
+			`- **TER Score**: ${terResult.score.toFixed(1)}/100 - ${terResult.feedback}`,
+			``,
+			`## AI Evaluation (Score: ${aiScore}/100)`,
+			aiFeedback,
+		];
+
+		return sections.join("\n");
+	}
+}
+
+/**
+ * Creates a translation quality evaluator that combines multiple metrics
+ *
+ * This evaluator uses:
+ * - BLEU: N-gram precision for lexical similarity
+ * - TER: Translation Edit Rate (lower is better, inverted for scoring)
+ * - AI: LLM-based semantic evaluation
  *
  * @param options - Configuration options
- * @returns A configured Evaluator instance
+ * @returns A configured composite evaluator instance
  */
 export function createTranslationEvaluator(
 	options: TranslationEvaluatorOptions,
-): Evaluator {
+): CompositeTranslationEvaluator {
 	const {
 		model,
 		targetLanguage,
 		sourceLanguage,
-		weights = {},
 		scoreConfig = {},
 		modelSettings,
 	} = options;
 
-	// Normalize weights
-	const w = {
-		accuracy: weights.accuracy ?? 0.35,
-		fluency: weights.fluency ?? 0.25,
-		grammar: weights.grammar ?? 0.15,
-		terminology: weights.terminology ?? 0.15,
-		style: weights.style ?? 0.1,
-	};
-
-	// Validate weights sum to approximately 1.0
-	const totalWeight = Object.values(w).reduce((sum, val) => sum + val, 0);
-	if (Math.abs(totalWeight - 1) > 0.01) {
-		console.warn(
-			`[eval-kit] Translation evaluator weights sum to ${totalWeight.toFixed(2)}, expected 1.0. ` +
-				"Scores may not reflect intended criteria importance.",
-		);
-	}
-
 	const minScore = scoreConfig.min ?? 0;
 	const maxScore = scoreConfig.max ?? 100;
 
+	// AI evaluator focuses on semantic quality aspects that lexical metrics miss
 	const evaluationPrompt = `You are an expert translation quality evaluator${sourceLanguage ? ` specializing in ${sourceLanguage} to ${targetLanguage} translation` : ` for ${targetLanguage}`}.
 
 # Task
-Evaluate the quality of the translation below.
+Evaluate the semantic quality of the translation below. Focus on aspects that lexical metrics (BLEU, TER) cannot capture.
 
 # Input
 ${sourceLanguage ? `Source Language: ${sourceLanguage}` : ""}
@@ -130,34 +266,25 @@ Translation: {{candidateText}}
 
 # Evaluation Criteria
 
-Assess the translation on these dimensions:
+Focus on these semantic dimensions:
 
-1. **Accuracy (${(w.accuracy * 100).toFixed(0)}%)**: Does the translation convey the same meaning as the source? Are there any omissions, additions, or mistranslations?
+1. **Meaning Preservation**: Does the translation accurately convey the intended meaning? Are there semantic distortions, omissions, or additions?
 
-2. **Fluency (${(w.fluency * 100).toFixed(0)}%)**: Does the translation read naturally in ${targetLanguage}? Is it idiomatic and easy to understand?
+2. **Fluency & Naturalness**: Does the translation read naturally in ${targetLanguage}? Is it idiomatic?
 
-3. **Grammar (${(w.grammar * 100).toFixed(0)}%)**: Is the translation grammatically correct? Are there any errors in syntax, morphology, or punctuation?
+3. **Terminology**: Are domain-specific terms translated appropriately and consistently?
 
-4. **Terminology (${(w.terminology * 100).toFixed(0)}%)**: Are domain-specific terms and concepts translated appropriately? Is terminology consistent?
-
-5. **Style (${(w.style * 100).toFixed(0)}%)**: Does the translation maintain the appropriate tone, register, and style of the source?
+4. **Style & Tone**: Does the translation maintain the appropriate register and style?
 
 # Instructions
 
 Provide:
-1. A detailed evaluation covering each criterion
-2. Specific examples of strengths and weaknesses
-3. Suggestions for improvement if applicable
-4. An overall score from ${minScore} to ${maxScore}
+1. A concise evaluation focusing on semantic quality
+2. Specific examples of issues or strengths
+3. An overall score from ${minScore} to ${maxScore}`;
 
-${
-	options.weights
-		? "\nNote: The score should reflect the weighted importance of each criterion as indicated above."
-		: ""
-}`;
-
-	return new Evaluator({
-		name: `translation-quality-${targetLanguage.toLowerCase().replace(/\s+/g, "-")}`,
+	const aiEvaluator = new Evaluator({
+		name: `translation-ai-${targetLanguage.toLowerCase().replace(/\s+/g, "-")}`,
 		model,
 		evaluationPrompt,
 		scoreConfig: {
@@ -167,10 +294,12 @@ ${
 			float: true,
 		},
 		modelSettings: {
-			temperature: 0.3, // Lower temperature for more consistent evaluation
+			temperature: 0.3,
 			...modelSettings,
 		},
 	});
+
+	return new CompositeTranslationEvaluator(options, aiEvaluator);
 }
 
 /**
