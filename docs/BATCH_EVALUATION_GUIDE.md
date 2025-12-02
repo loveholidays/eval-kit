@@ -453,7 +453,61 @@ await batchEvaluator.export({
 
 ### Progress Tracking
 
-Monitor progress in real-time:
+Monitor progress in real-time using the `onProgress` callback:
+
+```typescript
+import { BatchEvaluator, type ProgressEvent } from "eval-kit";
+
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [myEvaluator],
+  concurrency: 5,
+  onProgress: (event: ProgressEvent) => {
+    const timestamp = new Date().toISOString();
+    const pct = event.percentComplete.toFixed(1);
+    const eta = event.estimatedTimeRemaining
+      ? `ETA: ${Math.round(event.estimatedTimeRemaining / 1000)}s`
+      : "";
+
+    console.log(
+      `[${timestamp}] ${event.type.toUpperCase()} - ${event.processedRows}/${event.totalRows} (${pct}%) ${eta}`
+    );
+  },
+  progressInterval: 2000,  // Emit progress every 2 seconds
+});
+```
+
+#### ProgressEvent Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `ProgressEventType` | Event type: `started`, `progress`, `completed`, `error`, `retry`, `paused`, `resumed` |
+| `timestamp` | `string` | ISO timestamp of the event |
+| `totalRows` | `number` | Total number of rows to process |
+| `processedRows` | `number` | Number of rows processed so far |
+| `successfulRows` | `number` | Number of successful evaluations |
+| `failedRows` | `number` | Number of failed evaluations |
+| `currentRow` | `number?` | Index of the row currently being processed |
+| `percentComplete` | `number` | Percentage complete (0-100) |
+| `estimatedTimeRemaining` | `number?` | Estimated milliseconds remaining |
+| `averageProcessingTime` | `number?` | Average milliseconds per row |
+| `currentError` | `string?` | Error message if `type` is `error` |
+| `retryCount` | `number?` | Retry attempt number if `type` is `retry` |
+| `estimatedCostUSD` | `number?` | Running total estimated cost in USD |
+| `estimatedTokensRemaining` | `number?` | Estimated tokens remaining to process |
+
+#### Example Output
+
+```
+[2025-12-02T17:45:23.456Z] STARTED - 0/5236 (0.0%)
+[2025-12-02T17:45:24.789Z] PROGRESS - 50/5236 (1.0%) ETA: 520s
+[2025-12-02T17:45:26.123Z] PROGRESS - 100/5236 (1.9%) ETA: 510s
+...
+[2025-12-02T17:54:12.456Z] COMPLETED - 5236/5236 (100.0%)
+```
+
+#### Advanced Progress Tracking
+
+For more detailed progress tracking with cost estimation:
 
 ```typescript
 const batchEvaluator = new BatchEvaluator({
