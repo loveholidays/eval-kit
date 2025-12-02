@@ -85,6 +85,15 @@ export class ProgressTracker {
 	}
 
 	/**
+	 * Skip rows (for resuming from a specific index)
+	 * This marks rows as processed without actually processing them
+	 */
+	skipRows(count: number): void {
+		this.processedRows += count;
+		this.successfulRows += count; // Assume skipped rows were successful in previous run
+	}
+
+	/**
 	 * Emit if interval has passed
 	 */
 	private maybeEmit(
