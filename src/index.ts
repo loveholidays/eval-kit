@@ -74,6 +74,12 @@ export {
 	createTranslationAdequacyEvaluator,
 	createTranslationFluencyEvaluator,
 	type TranslationEvaluatorOptions,
+	createAIContentEvaluator,
+	createRelevanceEvaluator,
+	createFactualityEvaluator,
+	createSafetyEvaluator,
+	createToneEvaluator,
+	type AIContentEvaluatorOptions,
 } from "./templates/index.js";
 
 // Utilities
