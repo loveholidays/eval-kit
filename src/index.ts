@@ -17,11 +17,11 @@ export {
 	type TerResult,
 } from "./metrics/ter.js";
 
-export {
-	calculateBertScore,
-	clearBertCache,
-	type BertScoreOptions,
-	type BertScoreResult,
+// BERT score and perplexity use @xenova/transformers which requires sharp.
+// Re-export types only; functions must be imported directly from submodules.
+export type {
+	BertScoreOptions,
+	BertScoreResult,
 } from "./metrics/bert-score.js";
 
 export {
@@ -30,12 +30,27 @@ export {
 	type CoherenceResult,
 } from "./metrics/coherence.js";
 
-export {
-	calculatePerplexity,
-	clearPerplexityCache,
-	type PerplexityOptions,
-	type PerplexityResult,
+export type {
+	PerplexityOptions,
+	PerplexityResult,
 } from "./metrics/perplexity.js";
+
+// Lazy loaders for heavy metrics (avoid loading sharp at import time)
+export async function loadBertScore() {
+	const mod = await import("./metrics/bert-score.js");
+	return {
+		calculateBertScore: mod.calculateBertScore,
+		clearBertCache: mod.clearBertCache,
+	};
+}
+
+export async function loadPerplexity() {
+	const mod = await import("./metrics/perplexity.js");
+	return {
+		calculatePerplexity: mod.calculatePerplexity,
+		clearPerplexityCache: mod.clearPerplexityCache,
+	};
+}
 
 // Evaluator
 export { Evaluator } from "./evaluators/evaluator.js";

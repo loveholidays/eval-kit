@@ -1,9 +1,9 @@
 import { parse } from "csv-parse/sync";
 import { readFile } from "node:fs/promises";
-import type { BatchInputConfig, BatchInputRow } from "../types.js";
+import type { BatchInputFileConfig, BatchInputRow } from "../types.js";
 
 export class CsvParser {
-	async parse(config: BatchInputConfig): Promise<BatchInputRow[]> {
+	async parse(config: BatchInputFileConfig): Promise<BatchInputRow[]> {
 		const {
 			filePath,
 			csvOptions = {},

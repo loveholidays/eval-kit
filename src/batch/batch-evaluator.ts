@@ -14,6 +14,7 @@ import type {
 	BatchEvaluatorConfig,
 	BatchExportConfig,
 	BatchInputConfig,
+	BatchInputFileConfig,
 	BatchInputRow,
 	BatchResult,
 	BatchState,
@@ -33,7 +34,7 @@ export class BatchEvaluator {
 
 	constructor(config: BatchEvaluatorConfig) {
 		this.config = config;
-		this.evaluators = config.evaluators;
+		this.evaluators = [...config.evaluators];
 		this.batchId = randomUUID();
 		this.startTime = new Date().toISOString();
 
@@ -147,18 +148,25 @@ export class BatchEvaluator {
 	}
 
 	/**
-	 * Parse input file
+	 * Parse input - supports both file-based and in-memory data
 	 */
 	private async parseInput(config: BatchInputConfig): Promise<BatchInputRow[]> {
-		let format = config.format;
+		// Check if it's in-memory data config
+		if ("data" in config) {
+			return config.data;
+		}
+
+		// File-based config
+		const fileConfig = config as BatchInputFileConfig;
+		let format = fileConfig.format;
 
 		// Handle "auto" format detection
 		if (!format || format === "auto") {
-			format = this.detectFormat(config.filePath);
+			format = this.detectFormat(fileConfig.filePath);
 		}
 
 		const parser = this.getParser(format);
-		return parser.parse(config);
+		return parser.parse(fileConfig);
 	}
 
 	/**
@@ -246,6 +254,7 @@ export class BatchEvaluator {
 						rowIndex: index,
 						input: inputData,
 						results: evaluatorResults,
+						score: this.calculateCombinedScore(evaluatorResults),
 						timestamp: new Date().toISOString(),
 						durationMs,
 						retryCount,
@@ -308,6 +317,7 @@ export class BatchEvaluator {
 							rowIndex: index,
 							input: row,
 							results: [],
+							score: "N/A",
 							timestamp: new Date().toISOString(),
 							durationMs,
 							retryCount,
@@ -422,6 +432,39 @@ export class BatchEvaluator {
 	}
 
 	/**
+	 * Calculate combined score from evaluator results (weighted if weights provided, otherwise average)
+	 */
+	private calculateCombinedScore(evaluatorResults: EvaluatorResult[]): number | "N/A" {
+		const hasWeights = this.evaluators.some((e) => e.weight !== undefined);
+		let weightedSum = 0;
+		let totalWeight = 0;
+		let unweightedSum = 0;
+		let unweightedCount = 0;
+
+		for (const result of evaluatorResults) {
+			if (typeof result.score !== "number") continue;
+
+			const evaluator = this.evaluators.find((e) => e.name === result.evaluatorName);
+			const weight = evaluator?.weight;
+
+			if (hasWeights && weight !== undefined) {
+				weightedSum += result.score * weight;
+				totalWeight += weight;
+			} else {
+				unweightedSum += result.score;
+				unweightedCount++;
+			}
+		}
+
+		if (hasWeights && totalWeight > 0) {
+			return weightedSum / totalWeight;
+		} else if (unweightedCount > 0) {
+			return unweightedSum / unweightedCount;
+		}
+		return "N/A";
+	}
+
+	/**
 	 * Resume from previous state
 	 */
 	private resumeFromState(state: BatchState): void {
@@ -445,26 +488,67 @@ export class BatchEvaluator {
 		const successfulRows = this.results.filter((r) => !r.error).length;
 		const failedRows = this.results.filter((r) => r.error).length;
 
-		// Calculate average scores per evaluator
-		const averageScores: Record<string, number | string> = {};
+		// Calculate scores per evaluator with raw scores
+		const evaluatorScores: Record<string, {
+			average: number | "N/A";
+			weight?: number;
+			scores: number[];
+		}> = {};
+
+		// Check if any evaluator has weights defined
+		const hasWeights = this.evaluators.some((e) => e.weight !== undefined);
+		let weightedSum = 0;
+		let totalWeight = 0;
+		let unweightedSum = 0;
+		let unweightedCount = 0;
+
 		for (const evaluator of this.evaluators) {
 			const scores = this.results
 				.flatMap((r) => r.results)
 				.filter((r) => r.evaluatorName === evaluator.name && typeof r.score === "number")
 				.map((r) => r.score as number);
 
+			const weight = evaluator.weight;
+
 			if (scores.length > 0) {
-				averageScores[evaluator.name] =
-					scores.reduce((sum, s) => sum + s, 0) / scores.length;
+				const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+				evaluatorScores[evaluator.name] = {
+					average: avg,
+					weight,
+					scores,
+				};
+
+				// Accumulate for overall score calculation
+				if (hasWeights && weight !== undefined) {
+					weightedSum += avg * weight;
+					totalWeight += weight;
+				} else {
+					unweightedSum += avg;
+					unweightedCount++;
+				}
 			} else {
-				averageScores[evaluator.name] = "N/A";
+				evaluatorScores[evaluator.name] = {
+					average: "N/A",
+					weight,
+					scores: [],
+				};
 			}
+		}
+
+		// Calculate overall score (weighted if weights provided, otherwise average)
+		let score: number | "N/A" = "N/A";
+		if (hasWeights && totalWeight > 0) {
+			score = weightedSum / totalWeight;
+		} else if (unweightedCount > 0) {
+			score = unweightedSum / unweightedCount;
 		}
 
 		// Calculate average processing time
 		const processingTimes = this.results.map((r) => r.durationMs);
 		const averageProcessingTime =
-			processingTimes.reduce((sum, t) => sum + t, 0) / processingTimes.length;
+			processingTimes.length > 0
+				? processingTimes.reduce((sum, t) => sum + t, 0) / processingTimes.length
+				: 0;
 
 		// Calculate total tokens
 		const totalTokensUsed = this.results.reduce(
@@ -484,10 +568,11 @@ export class BatchEvaluator {
 			failedRows,
 			results: this.results,
 			summary: {
-				averageScores,
+				score,
+				evaluatorScores,
 				averageProcessingTime,
 				totalTokensUsed: totalTokensUsed > 0 ? totalTokensUsed : undefined,
-				errorRate: failedRows / this.results.length,
+				errorRate: this.results.length > 0 ? failedRows / this.results.length : 0,
 			},
 		};
 	}

@@ -10,6 +10,7 @@ import { TemplateRenderer } from "../utils/template-engine.js";
 export class Evaluator {
 	readonly name: string;
 	readonly timeout?: number;
+	readonly weight?: number;
 
 	private readonly model: EvaluatorConfig["model"];
 	private readonly evaluationPrompt: string;
@@ -20,6 +21,7 @@ export class Evaluator {
 	constructor(config: EvaluatorConfig) {
 		this.name = config.name;
 		this.timeout = config.timeout;
+		this.weight = config.weight;
 
 		this.model = config.model;
 		this.evaluationPrompt = config.evaluationPrompt;
