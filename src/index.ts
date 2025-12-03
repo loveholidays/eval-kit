@@ -69,20 +69,6 @@ export type {
 	ProgressEventType,
 } from "./batch/types.js";
 
-// Templates
-export {
-	createTranslationEvaluator,
-	createTranslationAdequacyEvaluator,
-	createTranslationFluencyEvaluator,
-	type TranslationEvaluatorOptions,
-	createAIContentEvaluator,
-	createRelevanceEvaluator,
-	createFactualityEvaluator,
-	createSafetyEvaluator,
-	createToneEvaluator,
-	type AIContentEvaluatorOptions,
-} from "./templates/index.js";
-
 // Utilities
 export { tokenizeWords, tokenizeSentences } from "./utils/tokenization.js";
 export {
