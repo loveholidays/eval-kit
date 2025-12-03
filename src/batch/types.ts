@@ -20,6 +20,7 @@ export interface BatchEvaluationResult {
 	readonly rowIndex: number;
 	readonly input: BatchInputRow;
 	readonly results: EvaluatorResult[];
+	readonly score: number | "N/A"; // Combined score (weighted if weights provided, otherwise average)
 	readonly timestamp: string;
 	readonly durationMs: number;
 	readonly retryCount: number;
@@ -30,8 +31,8 @@ export interface BatchEvaluationResult {
  * Configuration for BatchEvaluator
  */
 export interface BatchEvaluatorConfig {
-	// Evaluators to run on each input
-	readonly evaluators: IEvaluator[];
+	// Evaluators to run on each input (use evaluator.weight for weighted scoring)
+	readonly evaluators: readonly IEvaluator[];
 
 	// Common input fields applied to all rows
 	readonly defaultInput?: {
@@ -78,9 +79,14 @@ export interface BatchEvaluatorConfig {
 }
 
 /**
- * Input configuration
+ * Input configuration - supports either file path or in-memory data array
  */
-export interface BatchInputConfig {
+export type BatchInputConfig = BatchInputFileConfig | BatchInputDataConfig;
+
+/**
+ * File-based input configuration
+ */
+export interface BatchInputFileConfig {
 	readonly filePath: string;
 	readonly format?: "csv" | "json" | "auto"; // Default: 'auto' (detect from extension)
 
@@ -113,6 +119,16 @@ export interface BatchInputConfig {
 		readonly language?: string;
 		readonly id?: string; // Optional row identifier
 	};
+}
+
+/**
+ * In-memory data input configuration
+ */
+export interface BatchInputDataConfig {
+	readonly data: BatchInputRow[];
+
+	// Resume support
+	readonly startIndex?: number; // Skip rows before this index (0-based)
 }
 
 /**
@@ -213,7 +229,12 @@ export interface BatchResult {
 	readonly failedRows: number;
 	readonly results: BatchEvaluationResult[];
 	readonly summary: {
-		readonly averageScores: Record<string, number | string>; // Per evaluator
+		readonly score: number | "N/A"; // Overall score (weighted if weights provided, otherwise average)
+		readonly evaluatorScores: Record<string, {
+			readonly average: number | "N/A"; // Average score for this evaluator
+			readonly weight?: number; // Weight if provided
+			readonly scores: number[]; // Raw scores from each row
+		}>;
 		readonly averageProcessingTime: number;
 		readonly totalTokensUsed?: number;
 		readonly errorRate: number;
