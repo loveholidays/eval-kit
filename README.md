@@ -7,7 +7,6 @@ A comprehensive TypeScript SDK for evaluating content quality using both traditi
 - **Traditional Metrics** - BLEU, TER, BERTScore, Coherence, Perplexity
 - **AI-Powered Evaluation** - LLM evaluator with prompt templating via Vercel AI SDK
 - **Batch Processing** - Concurrent execution, progress tracking, streaming export, fault tolerance
-- **Pre-Built Templates** - Translation quality, AI content quality, content moderation
 
 ## Installation
 
@@ -61,26 +60,6 @@ console.log(result.score);    // 95
 console.log(result.feedback); // Detailed feedback
 ```
 
-### Pre-Built Templates
-
-```typescript
-import { anthropic } from '@ai-sdk/anthropic';
-import { createTranslationEvaluator, createAIContentEvaluator } from 'eval-kit';
-
-// Translation quality evaluator (combines BLEU, TER, and AI metrics)
-const translationEval = createTranslationEvaluator({
-  model: anthropic('claude-3-5-haiku-20241022'),
-  targetLanguage: 'French',
-  sourceLanguage: 'English',
-});
-
-// AI content quality evaluator
-const contentEval = createAIContentEvaluator({
-  model: anthropic('claude-3-5-haiku-20241022'),
-  contentType: 'blog-post',
-});
-```
-
 ### Batch Evaluation
 
 ```typescript
@@ -100,11 +79,9 @@ await batchEvaluator.evaluate({ filePath: './data.json' });
 | Guide | Description |
 |-------|-------------|
 | [Metrics](./docs/METRICS.md) | BLEU, TER, BERTScore, Coherence, Perplexity |
-| [Evaluator](./docs/EVALUATOR.md) | AI-powered evaluation, templates, scoring |
+| [Evaluator](./docs/EVALUATOR.md) | AI-powered evaluation, scoring |
 | [Batch Evaluation](./docs/BATCH_EVALUATION_GUIDE.md) | Concurrent processing, progress tracking, state management |
 | [Export](./docs/EXPORT_GUIDE.md) | CSV, JSON, webhook exports |
-| [Translation Template](./docs/TEMPLATE_TRANSLATION.md) | Multi-metric translation evaluation |
-| [AI Content Template](./docs/TEMPLATE_AI_CONTENT.md) | Content quality evaluation |
 
 ## Supported LLM Providers
 
