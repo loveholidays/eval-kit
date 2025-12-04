@@ -72,6 +72,7 @@ export class Evaluator {
 
 			return {
 				evaluatorName: this.name,
+				model: this.model.modelId,
 				score: result.object.score,
 				feedback: result.object.feedback,
 				processingStats: {
@@ -81,15 +82,18 @@ export class Evaluator {
 			};
 		} catch (error) {
 			const executionTime = Date.now() - startTime;
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorDetails = error instanceof Error && 'cause' in error ? String(error.cause) : undefined;
 
 			return {
 				evaluatorName: this.name,
+				model: this.model.modelId,
 				score: 0,
-				feedback: `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
+				feedback: `Evaluation failed: ${errorMessage}`,
 				processingStats: {
 					executionTime,
 				},
-				error: error instanceof Error ? error.message : String(error),
+				error: errorDetails ? `${errorMessage} (${errorDetails})` : errorMessage,
 			};
 		}
 	}
