@@ -16,7 +16,6 @@ export interface EvaluatorResult {
 	readonly score: number | string;
 	readonly feedback: string;
 	readonly processingStats: ProcessingStats;
-	readonly success: boolean;
 	readonly error?: string;
 }
 
@@ -50,7 +49,6 @@ export interface EvaluatorConfig {
 	evaluationPrompt: string;
 	scoreConfig?: ScoreConfig;
 	timeout?: number;
-	weight?: number; // Optional weight for weighted scoring in batch evaluation
 	modelSettings?: {
 		temperature?: number;
 		maxOutputTokens?: number;
@@ -79,6 +77,5 @@ export interface EvaluationInput {
 export interface IEvaluator {
 	readonly name: string;
 	readonly timeout?: number;
-	readonly weight?: number; // Optional weight for weighted scoring in batch evaluation
 	evaluate(input: EvaluationInput): Promise<EvaluatorResult>;
 }

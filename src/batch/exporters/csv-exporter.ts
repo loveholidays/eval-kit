@@ -86,7 +86,6 @@ export class CsvExporter {
 
 				flat[`${prefix}evaluatorName`] = evalResult.evaluatorName;
 				flat[`${prefix}score`] = evalResult.score;
-				flat[`${prefix}success`] = evalResult.success;
 				flat[`${prefix}feedback`] = evalResult.feedback;
 
 				if (evalResult.processingStats) {

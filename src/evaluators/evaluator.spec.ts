@@ -72,7 +72,6 @@ describe("Evaluator", () => {
 				candidateText: "The quick brown fox jumps over the lazy dog.",
 			});
 
-			expect(result.success).toBe(true);
 			expect(result.evaluatorName).toBe("fluency");
 			expect(result.score).toBe(90);
 			expect(result.feedback).toBe("Excellent fluency");
@@ -105,7 +104,6 @@ Candidate: {{candidateText}}
 				referenceText: "Hello world!",
 			});
 
-			expect(result.success).toBe(true);
 			expect(result.score).toBe(88);
 		});
 
@@ -124,7 +122,6 @@ Candidate: {{candidateText}}
 				candidateText: "Test",
 			});
 
-			expect(result.success).toBe(false);
 			expect(result.error).toBeDefined();
 			expect(result.feedback).toContain("Evaluation failed");
 			expect(result.processingStats.executionTime).toBeGreaterThanOrEqual(0);
@@ -152,7 +149,6 @@ Candidate: {{candidateText}}
 				candidateText: "Test",
 			});
 
-			expect(result.success).toBe(true);
 			expect(result.score).toBe("excellent");
 		});
 
@@ -180,7 +176,6 @@ Candidate: {{candidateText}}
 				candidateText: "Test",
 			});
 
-			expect(result.success).toBe(true);
 			expect(result.score).toBe(8);
 		});
 
