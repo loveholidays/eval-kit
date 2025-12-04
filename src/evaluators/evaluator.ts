@@ -53,7 +53,7 @@ export class Evaluator {
 
 			const schema = this.createSchema();
 
-			const result = await generateObject({
+			const result = (await generateObject({
 				model: this.model,
 				schema,
 				prompt,
@@ -64,7 +64,8 @@ export class Evaluator {
 				presencePenalty: this.modelSettings?.presencePenalty,
 				frequencyPenalty: this.modelSettings?.frequencyPenalty,
 				seed: this.modelSettings?.seed,
-			});
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any)) as unknown as { object: { score: number | string; feedback: string }; usage: unknown };
 
 			const executionTime = Date.now() - startTime;
 			const tokenUsage = this.extractTokenUsage(result.usage);
@@ -116,10 +117,10 @@ export class Evaluator {
 		};
 	}
 
-	private createSchema() {
+	private createSchema(): z.ZodObject<{ score: z.ZodTypeAny; feedback: z.ZodString }> {
 		if (this.scoreConfig.type === "numeric") {
 			const { min, max, float } = this.scoreConfig;
-			let scoreSchema = z.number().min(min).max(max);
+			let scoreSchema: z.ZodNumber = z.number().min(min).max(max);
 
 			if (float === false) {
 				scoreSchema = scoreSchema.int();
