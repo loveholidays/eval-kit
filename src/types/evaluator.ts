@@ -13,6 +13,7 @@ export interface ProcessingStats {
 
 export interface EvaluatorResult {
 	readonly evaluatorName: string;
+	readonly model?: string;
 	readonly score: number | string;
 	readonly feedback: string;
 	readonly processingStats: ProcessingStats;
