@@ -20,7 +20,7 @@ export interface BatchEvaluationResult {
 	readonly rowIndex: number;
 	readonly input: BatchInputRow;
 	readonly results: EvaluatorResult[];
-	readonly score: number | "N/A"; // Combined score (weighted if weights provided, otherwise average)
+	readonly score?: number | "N/A"; // Combined score - only present if calculateCombinedScore is provided
 	readonly timestamp: string;
 	readonly durationMs: number;
 	readonly retryCount: number;
@@ -31,7 +31,6 @@ export interface BatchEvaluationResult {
  * Configuration for BatchEvaluator
  */
 export interface BatchEvaluatorConfig {
-	// Evaluators to run on each input (use evaluator.weight for weighted scoring)
 	readonly evaluators: readonly IEvaluator[];
 
 	// Common input fields applied to all rows
@@ -63,6 +62,9 @@ export interface BatchEvaluatorConfig {
 	// Progress tracking
 	readonly onProgress?: (event: ProgressEvent) => void | Promise<void>;
 	readonly progressInterval?: number; // Default: 1000ms
+
+	// Custom scoring - only include score in results if this callback is provided
+	readonly calculateCombinedScore?: (results: EvaluatorResult[]) => number | "N/A";
 
 	// Result streaming
 	readonly onResult?: (result: BatchEvaluationResult) => void | Promise<void>;
@@ -229,12 +231,6 @@ export interface BatchResult {
 	readonly failedRows: number;
 	readonly results: BatchEvaluationResult[];
 	readonly summary: {
-		readonly score: number | "N/A"; // Overall score (weighted if weights provided, otherwise average)
-		readonly evaluatorScores: Record<string, {
-			readonly average: number | "N/A"; // Average score for this evaluator
-			readonly weight?: number; // Weight if provided
-			readonly scores: number[]; // Raw scores from each row
-		}>;
 		readonly averageProcessingTime: number;
 		readonly totalTokensUsed?: number;
 		readonly errorRate: number;
