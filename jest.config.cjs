@@ -2,6 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  injectGlobals: true,
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
   testPathIgnorePatterns: [

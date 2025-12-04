@@ -2,13 +2,23 @@
   "name": "eval-kit",
   "version": "1.0.0",
   "description": "TypeScript SDK for content evaluation",
-  "main": "dist/index.js",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
   "scripts": {
-    "build": "tsc",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "build": "vite build",
+    "build:types": "tsc --emitDeclarationOnly",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
@@ -21,10 +31,14 @@
     "sdk",
     "typescript",
     "llm",
-    "ai"
+    "ai",
+    "metrics",
+    "bleu",
+    "bert-score"
   ],
   "author": "",
   "license": "ISC",
+  "sideEffects": false,
   "packageManager": "pnpm@10.20.0",
   "files": [
     "dist"
@@ -35,7 +49,9 @@
     "@types/node": "^24.10.1",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6",
+    "vite-plugin-dts": "^4.5.4"
   },
   "dependencies": {
     "@xenova/transformers": "^2.17.2",
