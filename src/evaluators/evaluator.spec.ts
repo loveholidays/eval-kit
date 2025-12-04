@@ -1,15 +1,14 @@
-import { Evaluator } from "./evaluator.js";
+import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import type { LanguageModel } from "ai";
 
-// Mock the ai module
-jest.mock("ai", () => ({
-	generateObject: jest.fn(),
+// Mock the ai module before importing Evaluator
+const mockGenerateObject = jest.fn();
+jest.unstable_mockModule("ai", () => ({
+	generateObject: mockGenerateObject,
 }));
 
-import { generateObject } from "ai";
-const mockGenerateObject = generateObject as jest.MockedFunction<
-	typeof generateObject
->;
+// Import after mocking
+const { Evaluator } = await import("./evaluator.js");
 
 // Create a mock LanguageModel
 const createMockModel = (): LanguageModel => {
