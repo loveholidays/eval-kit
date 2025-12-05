@@ -1,0 +1,25 @@
+{
+  "changesets": [
+    {
+      "releases": [
+        {
+          "name": "@loveholidays/eval-kit",
+          "type": "minor"
+        }
+      ],
+      "summary": "Add GitHub CI/CD workflows for automated testing and publishing",
+      "id": "gold-towns-speak"
+    }
+  ],
+  "releases": [
+    {
+      "name": "@loveholidays/eval-kit",
+      "type": "minor",
+      "oldVersion": "1.0.0",
+      "changesets": [
+        "gold-towns-speak"
+      ],
+      "newVersion": "1.1.0"
+    }
+  ]
+}
