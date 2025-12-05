@@ -26,7 +26,6 @@ jobs:
         with:
           node-version: "20"
           cache: "pnpm"
-          registry-url: "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/"
 
       - name: Authenticate to Google Artifact Registry
         env:
