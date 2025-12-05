@@ -3,12 +3,9 @@ import type { EvaluatorResult, IEvaluator } from "../types/evaluator.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { CsvExporter } from "./exporters/csv-exporter.js";
 import { JsonExporter } from "./exporters/json-exporter.js";
-import { WebhookExporter } from "./exporters/webhook-exporter.js";
 import { CsvParser } from "./parsers/csv-parser.js";
 import { JsonParser } from "./parsers/json-parser.js";
 import { ProgressTracker } from "./progress-tracker.js";
-import { StateManager } from "./state-manager.js";
-import { StreamingExporter } from "./streaming-exporter.js";
 import type {
 	BatchEvaluationResult,
 	BatchEvaluatorConfig,
@@ -17,16 +14,13 @@ import type {
 	BatchInputFileConfig,
 	BatchInputRow,
 	BatchResult,
-	BatchState,
 } from "./types.js";
 
 export class BatchEvaluator {
 	private readonly config: BatchEvaluatorConfig;
 	private readonly evaluators: IEvaluator[];
 	private readonly concurrencyManager: ConcurrencyManager;
-	private stateManager?: StateManager;
 	private progressTracker?: ProgressTracker;
-	private streamingExporter?: StreamingExporter;
 	private batchId: string;
 	private startTime: string;
 	private results: BatchEvaluationResult[] = [];
@@ -43,14 +37,6 @@ export class BatchEvaluator {
 			maxConcurrency: config.concurrency ?? 5,
 			rateLimit: config.rateLimit,
 		});
-
-		// Initialize state manager if needed
-		if (config.resumeFromState || config.saveStateInterval || config.onStateSave) {
-			this.stateManager = new StateManager({
-				autoSaveInterval: config.saveStateInterval,
-				onStateSave: config.onStateSave,
-			});
-		}
 	}
 
 	/**
@@ -69,17 +55,6 @@ export class BatchEvaluator {
 			this.processedRowIndices.add(i);
 		}
 
-		// Resume from previous state if provided
-		if (this.config.resumeFromState) {
-			this.resumeFromState(this.config.resumeFromState);
-		}
-
-		// Initialize streaming exporter if configured
-		if (this.config.streamExport) {
-			this.streamingExporter = new StreamingExporter(this.config.streamExport);
-			await this.streamingExporter.initialize();
-		}
-
 		// Initialize progress tracker (use total rows for accurate percentage)
 		this.progressTracker = new ProgressTracker({
 			totalRows: allRows.length,
@@ -91,21 +66,6 @@ export class BatchEvaluator {
 		// Fast-forward progress tracker for skipped rows
 		if (startIndex > 0) {
 			this.progressTracker.skipRows(startIndex);
-		}
-
-		// Initialize state if using state manager
-		if (this.stateManager && !this.config.resumeFromState) {
-			this.stateManager.initialize({
-				batchId: this.batchId,
-				startTime: this.startTime,
-				lastUpdateTime: new Date().toISOString(),
-				inputConfig,
-				evaluatorNames: this.evaluators.map((e) => e.name),
-				totalRows: allRows.length,
-				processedRowIndices: Array.from(this.processedRowIndices),
-				results: [],
-				progress: this.progressTracker.getCurrentProgress(),
-			});
 		}
 
 		// Process rows with controlled concurrency
@@ -124,16 +84,6 @@ export class BatchEvaluator {
 
 		// Mark completion
 		this.progressTracker.complete();
-
-		// Finalize streaming export
-		if (this.streamingExporter) {
-			await this.streamingExporter.finalize();
-		}
-
-		// Final state save
-		if (this.stateManager) {
-			await this.stateManager.cleanup();
-		}
 
 		// Return results
 		return this.buildResult();
@@ -197,14 +147,12 @@ export class BatchEvaluator {
 	/**
 	 * Get exporter for format
 	 */
-	private getExporter(format: "csv" | "json" | "webhook"): CsvExporter | JsonExporter | WebhookExporter {
+	private getExporter(format: "csv" | "json"): CsvExporter | JsonExporter {
 		switch (format) {
 			case "csv":
 				return new CsvExporter();
 			case "json":
 				return new JsonExporter();
-			case "webhook":
-				return new WebhookExporter();
 			default:
 				throw new Error(`Unsupported export format: ${format}`);
 		}
@@ -254,21 +202,12 @@ export class BatchEvaluator {
 						rowIndex: index,
 						input: inputData,
 						results: evaluatorResults,
-						...(this.config.calculateCombinedScore && {
-							score: this.config.calculateCombinedScore(evaluatorResults),
-						}),
 						timestamp: new Date().toISOString(),
 						durationMs,
 						retryCount,
 					};
 
-					// Export to streaming exporter FIRST
-					// This ensures if export fails, we can retry the entire row evaluation
-					if (this.streamingExporter) {
-						await this.streamingExporter.exportResult(result);
-					}
-
-					// Call onResult callback (after export, before storing in memory)
+					// Call onResult callback for streaming results
 					if (this.config.onResult) {
 						const callbackResult = this.config.onResult(result);
 						if (callbackResult instanceof Promise) {
@@ -276,21 +215,12 @@ export class BatchEvaluator {
 						}
 					}
 
-					// Now store result in memory (only after successful export & callback)
+					// Store result in memory
 					this.results.push(result);
 					this.processedRowIndices.add(index);
 
 					// Update progress
 					this.progressTracker?.recordSuccess(durationMs, tokensUsed);
-
-					// Update state
-					if (this.stateManager) {
-						this.stateManager.update({
-							processedRowIndices: Array.from(this.processedRowIndices),
-							results: this.results,
-							progress: this.progressTracker?.getCurrentProgress(),
-						});
-					}
 
 					return; // Success, exit retry loop
 				} catch (error) {
@@ -319,7 +249,6 @@ export class BatchEvaluator {
 							rowIndex: index,
 							input: row,
 							results: [],
-							...(this.config.calculateCombinedScore && { score: "N/A" as const }),
 							timestamp: new Date().toISOString(),
 							durationMs,
 							retryCount,
@@ -329,15 +258,6 @@ export class BatchEvaluator {
 						this.results.push(result);
 						this.processedRowIndices.add(index);
 						this.progressTracker?.recordFailure(durationMs);
-
-						// Update state
-						if (this.stateManager) {
-							this.stateManager.update({
-								processedRowIndices: Array.from(this.processedRowIndices),
-								results: this.results,
-								progress: this.progressTracker?.getCurrentProgress(),
-							});
-						}
 
 						// Stop on error if configured
 						if (this.config.stopOnError) {
@@ -434,20 +354,6 @@ export class BatchEvaluator {
 	}
 
 	/**
-	 * Resume from previous state
-	 */
-	private resumeFromState(state: BatchState): void {
-		this.batchId = state.batchId;
-		this.startTime = state.startTime;
-		this.results = [...state.results];
-		this.processedRowIndices = new Set(state.processedRowIndices);
-
-		if (this.stateManager) {
-			this.stateManager.initialize(state);
-		}
-	}
-
-	/**
 	 * Build final result
 	 */
 	private buildResult(): BatchResult {
@@ -503,13 +409,6 @@ export class BatchEvaluator {
 	 */
 	private sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	/**
-	 * Get current batch state (useful for debugging or manual state saves)
-	 */
-	getCurrentState(): BatchState | undefined {
-		return this.stateManager?.getState();
 	}
 
 	/**
