@@ -29,8 +29,10 @@ jobs:
           registry-url: "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/"
 
       - name: Authenticate to Google Artifact Registry
+        env:
+          NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
         run: |
-          echo "//europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/:_authToken=${{ secrets.GAR_NPM_TOKEN }}" >> .npmrc
+          echo "//europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/:_authToken=${NPM_PUBLISH_TOKEN}" >> .npmrc
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
