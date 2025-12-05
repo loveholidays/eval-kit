@@ -43,7 +43,7 @@
   "license": "ISC",
   "publishConfig": {
     "access": "restricted",
-    "registry": "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/"
+    "registry": "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/node-packages/"
   },
   "sideEffects": false,
   "packageManager": "pnpm@10.20.0",
