@@ -4,22 +4,22 @@
       "releases": [
         {
           "name": "@loveholidays/eval-kit",
-          "type": "minor"
+          "type": "patch"
         }
       ],
-      "summary": "Add GitHub CI/CD workflows for automated testing and publishing",
-      "id": "gold-towns-speak"
+      "summary": "Fix CI/CD workflow authentication for Google Artifact Registry publishing\n\n- Use Workload Identity Federation instead of static tokens\n- Align with webmono CI patterns for consistent authentication",
+      "id": "ci-workflow-improvements"
     }
   ],
   "releases": [
     {
       "name": "@loveholidays/eval-kit",
-      "type": "minor",
-      "oldVersion": "1.0.0",
+      "type": "patch",
+      "oldVersion": "1.1.0",
       "changesets": [
-        "gold-towns-speak"
+        "ci-workflow-improvements"
       ],
-      "newVersion": "1.1.0"
+      "newVersion": "1.1.1"
     }
   ]
 }
