@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.2
+
+### Patch Changes
+
+- a244287: Fix Artifact Registry URL to use node-packages repository
+
 ## 1.1.1
 
 ### Patch Changes
