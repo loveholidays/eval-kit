@@ -1,0 +1,78 @@
+name: Build Main
+
+on:
+  push:
+    branches: [main]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.LOVEHOLIDAYS_BUILD_PAT }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.LOVEHOLIDAYS_BUILD_PAT }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          registry-url: "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/"
+
+      - name: Authenticate to Google Artifact Registry
+        env:
+          NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: |
+          echo "//europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/:_authToken=${NPM_PUBLISH_TOKEN}" >> .npmrc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check changesets
+        id: changesets
+        run: |
+          pnpm changeset status --output status.json || true
+          if [ -f status.json ] && [ "$(cat status.json | jq '.releases | length')" -gt 0 ]; then
+            echo "HAS_CHANGESETS=true" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_CHANGESETS=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Version packages
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pnpm changeset version
+          git add .
+          git commit -m "chore: version packages" || echo "No changes to commit"
+          git push
+
+      - name: Publish packages
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: pnpm changeset publish
+
+      - name: Push tags
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: git push --tags

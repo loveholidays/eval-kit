@@ -109,6 +109,45 @@ pnpm test       # Run tests
 pnpm lint       # Lint code
 ```
 
+## Publishing
+
+This package uses [Changesets](https://github.com/changesets/changesets) for version management and is published to the loveholidays Google Artifact Registry.
+
+### Creating a Release
+
+1. **Add a changeset** when you make changes that should be released:
+   ```bash
+   pnpm changeset
+   ```
+   - Select the version bump type (patch/minor/major)
+   - Write a summary of your changes
+   - This creates a markdown file in `.changeset/`
+
+2. **Merge to main** — The CI will automatically:
+   - Detect changesets
+   - Bump the version in `package.json`
+   - Update `CHANGELOG.md`
+   - Publish to Google Artifact Registry
+   - Push git tags
+
+### Manual Publishing
+
+For local testing or manual releases:
+
+```bash
+pnpm build              # Build the package
+pnpm changeset version  # Apply version bumps
+pnpm changeset publish  # Publish to registry
+```
+
+### Version Types
+
+| Type | When to use |
+|------|-------------|
+| `patch` | Bug fixes, small updates |
+| `minor` | New features (backwards compatible) |
+| `major` | Breaking changes |
+
 ## License
 
 ISC
