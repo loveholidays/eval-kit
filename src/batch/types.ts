@@ -20,7 +20,6 @@ export interface BatchEvaluationResult {
 	readonly rowIndex: number;
 	readonly input: BatchInputRow;
 	readonly results: EvaluatorResult[];
-	readonly score?: number | "N/A"; // Combined score - only present if calculateCombinedScore is provided
 	readonly timestamp: string;
 	readonly durationMs: number;
 	readonly retryCount: number;
@@ -63,17 +62,8 @@ export interface BatchEvaluatorConfig {
 	readonly onProgress?: (event: ProgressEvent) => void | Promise<void>;
 	readonly progressInterval?: number; // Default: 1000ms
 
-	// Custom scoring - only include score in results if this callback is provided
-	readonly calculateCombinedScore?: (results: EvaluatorResult[]) => number | "N/A";
-
-	// Result streaming
+	// Result streaming - called for each result as it completes
 	readonly onResult?: (result: BatchEvaluationResult) => void | Promise<void>;
-	readonly streamExport?: BatchExportConfig; // Export each result as it completes
-
-	// State management
-	readonly resumeFromState?: BatchState;
-	readonly saveStateInterval?: number; // Auto-save interval in ms
-	readonly onStateSave?: (state: BatchState) => void | Promise<void>;
 
 	// Execution mode
 	readonly stopOnError?: boolean; // Default: false
@@ -137,8 +127,8 @@ export interface BatchInputDataConfig {
  * Export configuration
  */
 export interface BatchExportConfig {
-	readonly format: "csv" | "json" | "webhook";
-	readonly destination: string; // File path or webhook URL
+	readonly format: "csv" | "json";
+	readonly destination: string; // File path
 
 	// Resume support
 	readonly appendToExisting?: boolean; // Append to existing file instead of overwriting (default: false)
@@ -154,15 +144,6 @@ export interface BatchExportConfig {
 	readonly jsonOptions?: {
 		readonly pretty?: boolean;
 		readonly includeMetadata?: boolean;
-	};
-
-	// Webhook options
-	readonly webhookOptions?: {
-		readonly method?: "POST" | "PUT"; // Default: 'POST'
-		readonly headers?: Record<string, string>;
-		readonly batchSize?: number; // Send results in batches
-		readonly retryOnFailure?: boolean;
-		readonly timeout?: number;
 	};
 
 	// Export filtering
@@ -201,21 +182,6 @@ export interface ProgressEvent {
 	readonly retryCount?: number;
 	readonly estimatedCostUSD?: number; // Running total
 	readonly estimatedTokensRemaining?: number;
-}
-
-/**
- * Batch execution state for resume capability
- */
-export interface BatchState {
-	readonly batchId: string;
-	readonly startTime: string;
-	readonly lastUpdateTime: string;
-	readonly inputConfig: BatchInputConfig;
-	readonly evaluatorNames: string[];
-	readonly totalRows: number;
-	readonly processedRowIndices: number[];
-	readonly results: BatchEvaluationResult[];
-	readonly progress: ProgressEvent;
 }
 
 /**

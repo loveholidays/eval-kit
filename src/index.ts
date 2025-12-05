@@ -79,7 +79,6 @@ export type {
 	BatchInputRow,
 	BatchEvaluationResult,
 	BatchResult,
-	BatchState,
 	ProgressEvent,
 	ProgressEventType,
 } from "./batch/types.js";

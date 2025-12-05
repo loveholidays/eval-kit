@@ -7,21 +7,19 @@ Quick reference for exporting batch evaluation results.
 - [Export Formats](#export-formats)
 - [CSV Export](#csv-export)
 - [JSON Export](#json-export)
-- [Webhook Export](#webhook-export)
-- [Streaming vs Batch Export](#streaming-vs-batch-export)
+- [Real-time Result Handling](#real-time-result-handling)
 - [Filtering & Customization](#filtering--customization)
 
 ---
 
 ## Export Formats
 
-The batch evaluation system supports three export formats:
+The batch evaluation system supports two export formats:
 
 | Format | Use Case | Features |
 |--------|----------|----------|
 | **CSV** | Spreadsheet analysis, data science | Flattened structure, easy to import |
 | **JSON** | API integration, data pipelines | Preserves structure, metadata support |
-| **Webhook** | Real-time integration, event-driven systems | HTTP POST/PUT, batching, retry |
 
 ---
 
@@ -176,165 +174,78 @@ await batchEvaluator.export({
 
 ---
 
-## Webhook Export
+## Real-time Result Handling
 
-### Basic Webhook Export
+Use the `onResult` callback to handle results as they complete. This is more flexible than file-based export and works well for integrations.
 
-```typescript
-await batchEvaluator.export({
-  format: "webhook",
-  destination: "https://api.example.com/evaluations",
-  webhookOptions: {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer YOUR_TOKEN",
-      "Content-Type": "application/json",
-    },
-  },
-});
-```
-
-**Payload sent to webhook:**
-```json
-{
-  "timestamp": "2025-01-01T12:00:00Z",
-  "results": [
-    {
-      "rowId": "1",
-      "results": [...]
-    }
-  ],
-  "count": 1
-}
-```
-
-### Webhook with Batching
-
-Send results in batches:
-
-```typescript
-await batchEvaluator.export({
-  format: "webhook",
-  destination: "https://api.example.com/evaluations",
-  webhookOptions: {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer YOUR_TOKEN",
-    },
-    batchSize: 10,  // Send 10 results per request
-  },
-});
-```
-
-This will make multiple requests, each containing 10 results.
-
-### Webhook with Retry
-
-```typescript
-await batchEvaluator.export({
-  format: "webhook",
-  destination: "https://api.example.com/evaluations",
-  webhookOptions: {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer YOUR_TOKEN",
-    },
-    retryOnFailure: true,  // Retry once if request fails
-    timeout: 30000,         // 30 second timeout
-  },
-});
-```
-
-### Webhook Security
-
-⚠️ **Important**: Always validate webhook URLs before use. See [Security Guide](../SECURITY.md) for SSRF prevention.
-
-```typescript
-// Good practice: Use environment variable
-const WEBHOOK_URL = process.env.RESULTS_WEBHOOK_URL;
-
-if (!WEBHOOK_URL) {
-  throw new Error("RESULTS_WEBHOOK_URL not configured");
-}
-
-await batchEvaluator.export({
-  format: "webhook",
-  destination: WEBHOOK_URL,
-  webhookOptions: {
-    headers: {
-      "Authorization": `Bearer ${process.env.WEBHOOK_TOKEN}`,
-    },
-  },
-});
-```
-
----
-
-## Streaming vs Batch Export
-
-### Batch Export (Default)
-
-Export all results after evaluation completes:
-
-```typescript
-// 1. Run all evaluations
-const result = await batchEvaluator.evaluate({
-  filePath: "./inputs.csv",
-});
-
-// 2. Export when done
-await batchEvaluator.export({
-  format: "csv",
-  destination: "./results.csv",
-});
-```
-
-**Use when:**
-- Quick batches (< 100 rows)
-- Need to process results before export
-- Want complete results in memory
-
-### Streaming Export
-
-Export each result immediately after evaluation:
+### Basic onResult Usage
 
 ```typescript
 const batchEvaluator = new BatchEvaluator({
   evaluators: [myEvaluator],
   concurrency: 5,
-  // Export results as they complete
-  streamExport: {
-    format: "csv",
-    destination: "./results.csv",
-    csvOptions: {
-      flattenResults: true,
-      includeHeaders: true,
-    },
+  onResult: (result) => {
+    console.log(`Row ${result.rowId}: score ${result.results[0]?.score}`);
   },
 });
 
-// Results are exported during evaluation
 await batchEvaluator.evaluate({
   filePath: "./inputs.csv",
 });
-// File ./results.csv already contains all results!
 ```
 
-**Use when:**
-- Large batches (> 100 rows)
-- Need fault tolerance (save progress incrementally)
-- Want to monitor results in real-time
-- Integrating with streaming systems
+### Writing Results Incrementally
 
-### Comparison
+For fault tolerance, write each result to a file as it completes:
 
-| Feature | Batch Export | Streaming Export |
-|---------|--------------|------------------|
-| When exported | After all complete | As each completes |
-| Memory usage | Stores all in memory | Same (results kept) |
-| Fault tolerance | Lost on failure | Preserved incrementally |
-| Real-time monitoring | No | Yes (watch file) |
-| Post-processing | Easy | Harder |
+```typescript
+import { appendFileSync } from "fs";
+
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [myEvaluator],
+  concurrency: 5,
+  onResult: (result) => {
+    // Write each result as a JSON line
+    appendFileSync("./results.jsonl", JSON.stringify(result) + "\n");
+  },
+});
+
+await batchEvaluator.evaluate({
+  filePath: "./inputs.csv",
+});
+```
+
+### Sending Results to a Webhook
+
+```typescript
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [myEvaluator],
+  concurrency: 5,
+  onResult: async (result) => {
+    await fetch("https://api.example.com/results", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.API_TOKEN}`,
+      },
+      body: JSON.stringify(result),
+    });
+  },
+});
+
+await batchEvaluator.evaluate({
+  filePath: "./inputs.csv",
+});
+```
+
+### When to Use onResult vs export()
+
+| Approach | Use Case |
+|----------|----------|
+| `onResult` callback | Real-time processing, webhooks, database writes, alerting |
+| `export()` method | End-of-batch file export, CSV for spreadsheets, JSON for archives |
+
+You can use both together: `onResult` for real-time needs, then `export()` for a clean final file.
 
 ---
 
@@ -483,28 +394,33 @@ await batchEvaluator.export({
 });
 ```
 
-### Example 2: Continuous Monitoring
+### Example 2: Sentiment Monitoring with Alerts
 
 ```typescript
 const batchEvaluator = new BatchEvaluator({
   evaluators: [sentimentEvaluator],
   concurrency: 10,
-  // Stream results to CSV for monitoring
-  streamExport: {
-    format: "csv",
-    destination: "./live-results.csv",
-  },
-  // Send negative sentiment to webhook for alerts
+  // Send negative sentiment alerts in real-time
   onResult: async (result) => {
     const score = result.results[0]?.score;
     if (score === "NEGATIVE") {
-      await sendWebhook("https://alerts.example.com/negative", result);
+      await fetch("https://alerts.example.com/negative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
     }
   },
 });
 
-await batchEvaluator.evaluate({
+const result = await batchEvaluator.evaluate({
   filePath: "./social-media-posts.json",
+});
+
+// Export full results after completion
+await batchEvaluator.export({
+  format: "csv",
+  destination: "./sentiment-results.csv",
 });
 ```
 
@@ -534,14 +450,10 @@ await batchEvaluator.export({
 
 ## Best Practices
 
-1. **Use streaming export for large batches** (>100 rows) to preserve progress
+1. **Use onResult for large batches** to write results incrementally and preserve progress
 2. **Filter early** with `filterCondition` to reduce export size
-3. **Use webhooks for integration** with external systems
-4. **Always secure webhook URLs** - use environment variables, validate URLs
-5. **Enable retry for webhooks** in production
-6. **Use includeFields** to reduce file size for large exports
-7. **Test with small batches** before running large exports
-8. **Monitor webhook timeouts** and adjust as needed
+3. **Use includeFields** to reduce file size for large exports
+4. **Test with small batches** before running large exports
 
 ## Troubleshooting
 
@@ -549,20 +461,15 @@ await batchEvaluator.export({
 - Use `includeFields` to export only necessary columns
 - Disable `flattenResults` if you don't need flattened structure
 
-**Webhook timing out:**
-- Increase `timeout` in webhook options
-- Reduce `batchSize` to send smaller payloads
-- Check receiving endpoint performance
-
 **JSON too large:**
 - Use `filterCondition` to export only relevant results
 - Use `includeFields` to reduce payload size
 - Consider exporting to multiple files
 
-**Streaming export with missing rows:**
+**Missing rows in incremental output:**
 - Check for errors in `onProgress` events
 - Verify disk space available
-- Ensure proper error handling in evaluation
+- Make sure `onResult` isn't throwing errors
 
 ## See Also
 
