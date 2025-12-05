@@ -1,6 +1,7 @@
 import {
 	AutoTokenizer,
 	AutoModelForCausalLM,
+	Tensor,
 	type PreTrainedTokenizer,
 	type PreTrainedModel,
 } from "@xenova/transformers";
@@ -37,7 +38,7 @@ const getModelAndTokenizer = async (
 	const [tokenizer, model] = await Promise.all([
 		AutoTokenizer.from_pretrained(modelName),
 		AutoModelForCausalLM.from_pretrained(modelName, {
-			quantized: true,
+			quantized: false,
 		}),
 	]);
 
@@ -91,7 +92,7 @@ export const calculatePerplexity = async (
 	text: string,
 	options: PerplexityOptions = {},
 ): Promise<PerplexityResult> => {
-	const { model: modelName = "distilgpt2", stride = 512 } = options;
+	const { model: modelName = "Xenova/gpt2", stride = 512 } = options;
 
 	const { tokenizer, model } = await getModelAndTokenizer(modelName);
 
@@ -126,10 +127,11 @@ export const calculatePerplexity = async (
 		if (batch.length <= 1) continue;
 
 		const batchTensor = {
-			input_ids: {
-				data: new BigInt64Array(batch.map((x) => BigInt(x))),
-				dims: [1, batch.length],
-			},
+			input_ids: new Tensor(
+				"int64",
+				new BigInt64Array(batch.map((x) => BigInt(x))),
+				[1, batch.length],
+			),
 		};
 
 		const outputs = await model(batchTensor);
@@ -137,7 +139,8 @@ export const calculatePerplexity = async (
 
 		if (!logits || !logits.data) continue;
 
-		const vocabSize = (tokenizer.model as any).vocab?.length || 50257;
+		// Get vocab size from logits shape: [batch_size, seq_len, vocab_size]
+		const vocabSize = logits.dims?.[2] || 50257;
 		const logitsArray = Array.from(logits.data as Float32Array);
 
 		for (let j = 1; j < batch.length; j++) {

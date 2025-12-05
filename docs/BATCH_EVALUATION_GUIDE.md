@@ -22,8 +22,8 @@ The batch evaluation system allows you to process hundreds or thousands of evalu
 - **Controlled concurrency** - Limit parallel evaluations
 - **Rate limiting** - Respect API quotas
 - **Progress tracking** - Monitor progress in real-time
-- **Multiple export formats** - CSV, JSON, or webhooks
-- **Streaming export** - Save results immediately as they complete
+- **Export formats** - CSV and JSON
+- **Result streaming** - Process results as they complete via callback
 
 ### 5-Minute Example
 
@@ -404,25 +404,6 @@ await batchEvaluator.export({
 }
 ```
 
-### Export to Webhook
-
-```typescript
-await batchEvaluator.export({
-  format: "webhook",
-  destination: "https://api.example.com/results",
-  webhookOptions: {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer YOUR_TOKEN",
-      "Content-Type": "application/json",
-    },
-    batchSize: 10,            // Send 10 results per request
-    retryOnFailure: true,     // Retry failed requests
-    timeout: 30000,           // 30 second timeout
-  },
-});
-```
-
 ### Filter Results
 
 Export only specific results:
@@ -531,38 +512,39 @@ const batchEvaluator = new BatchEvaluator({
 });
 ```
 
-### Streaming Export
+### Result Streaming with onResult
 
-Export results immediately as they complete (don't wait for all evaluations to finish):
+Process each result as it completes using the `onResult` callback. This is useful for real-time logging, database writes, or custom integrations:
 
 ```typescript
+import { appendFileSync } from "fs";
+
 const batchEvaluator = new BatchEvaluator({
   evaluators: [myEvaluator],
   concurrency: 5,
-  // Stream results to CSV as each evaluation completes
-  streamExport: {
-    format: "csv",
-    destination: "./streaming-results.csv",
-    csvOptions: {
-      flattenResults: true,
-      includeHeaders: true,
-    },
+  // Handle each result as it completes
+  onResult: async (result) => {
+    // Log to console
+    console.log(`Processed row ${result.rowId}: score ${result.results[0]?.score}`);
+
+    // Append to file incrementally
+    appendFileSync("./results.jsonl", JSON.stringify(result) + "\n");
+
+    // Or send to database, webhook, etc.
+    await saveToDatabase(result);
   },
 });
 
 await batchEvaluator.evaluate({
   filePath: "./inputs.csv",
 });
-
-// Results are already exported!
-console.log("Results streamed to ./streaming-results.csv");
 ```
 
-**Benefits of streaming export:**
-- Results saved incrementally (fault-tolerant)
-- Monitor progress by watching the output file
-- Lower memory usage for large batches
-- Real-time integration with other systems
+**Why use onResult:**
+- Process results in real-time without waiting for the full batch
+- Write to files incrementally for fault tolerance
+- Send results to external systems as they complete
+- Custom logging or alerting on specific conditions
 
 ### Rate Limiting
 
@@ -602,89 +584,45 @@ const batchEvaluator = new BatchEvaluator({
 });
 ```
 
-### Resume from Interruption
+### Resuming Interrupted Batches
 
-Save state to resume interrupted batches:
+Use `startIndex` to skip rows that were already processed. This works well with the `onResult` callback to write results incrementally:
 
 ```typescript
-const batchEvaluator = new BatchEvaluator({
-  evaluators: [myEvaluator],
-  concurrency: 5,
-  // Save state every 30 seconds
-  saveStateInterval: 30000,
-  onStateSave: async (state) => {
-    // Save to file, database, or cloud storage
-    await saveToFile("./batch-state.json", state);
-  },
-});
+import { appendFileSync, readFileSync, existsSync } from "fs";
 
-try {
-  const result = await batchEvaluator.evaluate({
-    filePath: "./inputs.csv",
-  });
-} catch (error) {
-  console.error("Batch interrupted:", error);
-  console.log("State saved to ./batch-state.json");
+// Helper to find where we left off
+function getLastProcessedIndex(outputFile: string): number {
+  if (!existsSync(outputFile)) return 0;
+  const lines = readFileSync(outputFile, "utf-8").trim().split("\n");
+  if (lines.length === 0) return 0;
+  const lastLine = JSON.parse(lines[lines.length - 1]);
+  return lastLine.rowIndex + 1;
 }
 
-// Later, resume from saved state
-const savedState = await loadFromFile("./batch-state.json");
-const resumedEvaluator = new BatchEvaluator({
-  evaluators: [myEvaluator],
-  concurrency: 5,
-  resumeFromState: savedState,
-});
+const outputFile = "./results.jsonl";
+const startIndex = getLastProcessedIndex(outputFile);
 
-const result = await resumedEvaluator.evaluate({
-  filePath: "./inputs.csv",
-});
-```
+console.log(`Resuming from row ${startIndex}`);
 
-#### Simple Resume with startIndex
-
-For a simpler resume approach when using streaming export (CSV), use `startIndex` to skip already-processed rows:
-
-```typescript
-// Initial run - interrupted at row 500
 const batchEvaluator = new BatchEvaluator({
   evaluators: [myEvaluator],
   concurrency: 5,
-  streamExport: {
-    format: "csv",
-    destination: "./results.csv",
+  onResult: (result) => {
+    appendFileSync(outputFile, JSON.stringify(result) + "\n");
   },
 });
 
 await batchEvaluator.evaluate({
   filePath: "./inputs.json",
-});
-// Process interrupted... results.csv has 500 rows
-
-// Resume from row 500 (0-indexed)
-const resumeEvaluator = new BatchEvaluator({
-  evaluators: [myEvaluator],
-  concurrency: 5,
-  streamExport: {
-    format: "csv",
-    destination: "./results.csv",
-    appendToExisting: true,  // Append to existing file instead of overwriting
-  },
-});
-
-await resumeEvaluator.evaluate({
-  filePath: "./inputs.json",
-  startIndex: 500,  // Skip first 500 rows (already processed)
+  startIndex,  // Skip rows we've already processed
 });
 ```
-
-**Key options for simple resume:**
 
 | Option | Location | Description |
 |--------|----------|-------------|
 | `startIndex` | `BatchInputConfig` | Skip rows before this index (0-based) |
-| `appendToExisting` | `BatchExportConfig` | Append to existing CSV instead of overwriting |
-
-**Tip:** Check your partial results file to find the last `rowIndex` value, then use `startIndex = lastRowIndex + 1`.
+| `appendToExisting` | `BatchExportConfig` | Append to existing file when using export() |
 
 ### Multiple Evaluators
 
@@ -795,12 +733,6 @@ interface BatchEvaluatorConfig {
 
   // Result streaming (optional)
   onResult?: (result: BatchEvaluationResult) => void | Promise<void>;
-  streamExport?: BatchExportConfig;
-
-  // State management (optional)
-  resumeFromState?: BatchState;
-  saveStateInterval?: number;  // Auto-save interval in ms
-  onStateSave?: (state: BatchState) => void | Promise<void>;
 }
 ```
 
@@ -846,8 +778,8 @@ interface BatchInputConfig {
 
 ```typescript
 interface BatchExportConfig {
-  format: "csv" | "json" | "webhook";
-  destination: string;  // File path or webhook URL
+  format: "csv" | "json";
+  destination: string;  // File path
 
   // Resume support
   appendToExisting?: boolean;  // Append to existing file instead of overwriting (default: false)
@@ -863,15 +795,6 @@ interface BatchExportConfig {
   jsonOptions?: {
     pretty?: boolean;
     includeMetadata?: boolean;
-  };
-
-  // Webhook options
-  webhookOptions?: {
-    method?: "POST" | "PUT";
-    headers?: Record<string, string>;
-    batchSize?: number;
-    retryOnFailure?: boolean;
-    timeout?: number;
   };
 
   // Filtering
@@ -975,7 +898,7 @@ await batchEvaluator.export({
 });
 ```
 
-### Example 2: Content Moderation with Streaming
+### Example 2: Content Moderation with Real-time Alerts
 
 ```typescript
 const moderationEvaluator = new Evaluator({
@@ -988,12 +911,7 @@ const moderationEvaluator = new Evaluator({
 const batchEvaluator = new BatchEvaluator({
   evaluators: [moderationEvaluator],
   concurrency: 20,
-  // Stream results immediately
-  streamExport: {
-    format: "csv",
-    destination: "./moderation-results.csv",
-  },
-  // Alert on unsafe content
+  // Alert on unsafe content as results come in
   onResult: async (result) => {
     if (result.results[0]?.score === "UNSAFE") {
       await sendAlert(`Unsafe content: ${result.rowId}`);
@@ -1001,8 +919,13 @@ const batchEvaluator = new BatchEvaluator({
   },
 });
 
-await batchEvaluator.evaluate({
+const result = await batchEvaluator.evaluate({
   filePath: "./user-content.json",
+});
+
+await batchEvaluator.export({
+  format: "csv",
+  destination: "./moderation-results.csv",
 });
 ```
 
@@ -1079,18 +1002,16 @@ console.log(`Processed ${result.totalRows} items in ${result.durationMs / 1000}s
 ## Best Practices
 
 1. **Start with low concurrency** (5-10) and increase based on API limits
-2. **Use streaming export** for large batches to preserve partial progress
+2. **Use onResult callback** for large batches to write results incrementally
 3. **Enable progress tracking** to monitor long-running batches
 4. **Set appropriate rate limits** based on your API quotas
 5. **Use retry configuration** to handle transient errors
-6. **Save state periodically** for very long batches
-7. **Monitor costs** using the estimated cost in progress events
-8. **Test with small batches** before running large-scale evaluations
+6. **Test with small batches** before running large-scale evaluations
 
 ## Troubleshooting
 
 ### High memory usage
-- Use streaming export to avoid storing all results in memory
+- Use `onResult` to write results to disk instead of keeping all in memory
 - Reduce concurrency
 - Process in smaller batches
 
@@ -1104,13 +1025,13 @@ console.log(`Processed ${result.totalRows} items in ${result.durationMs / 1000}s
 - Reduce concurrency
 - Check API latency
 
-### Inconsistent results on resume
-- Ensure same evaluators and configuration
+### Resume not working correctly
+- Ensure the same evaluators and configuration are used
 - Verify input file hasn't changed
-- Check state file integrity
+- Check that `startIndex` matches your last processed row + 1
 
 ## See Also
 
 - [Security Considerations](../SECURITY.md)
-- [API Reference](./API_REFERENCE.md)
+- [Export Guide](./EXPORT_GUIDE.md)
 - [Examples Directory](../examples/)

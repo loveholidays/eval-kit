@@ -1,13 +1,12 @@
 # eval-kit
 
-A comprehensive TypeScript SDK for evaluating content quality using both traditional metrics and AI-powered evaluation.
+A TypeScript SDK for evaluating content quality using traditional metrics and AI-powered evaluation.
 
 ## Features
 
-- **Lightweight Metrics** - BLEU, TER, Coherence (no external models required)
-- **Heavy Metrics** - BERTScore, Perplexity (requires downloading transformer models)
-- **AI-Powered Evaluation** - LLM evaluator with prompt templating via Vercel AI SDK
-- **Batch Processing** - Concurrent execution, progress tracking, streaming export, fault tolerance
+- **Traditional Metrics**: BLEU, TER, BERTScore, Coherence, Perplexity
+- **AI-Powered Evaluation**: LLM-based evaluator with prompt templating (via Vercel AI SDK)
+- **Batch Processing**: Concurrent execution, progress tracking, retry logic, CSV/JSON export
 
 ## Installation
 
@@ -17,7 +16,7 @@ npm install eval-kit
 pnpm add eval-kit
 ```
 
-For AI evaluation features, you'll also need an AI SDK provider:
+For AI evaluation, you'll also need an AI SDK provider:
 
 ```bash
 npm install @ai-sdk/openai
@@ -31,18 +30,18 @@ npm install @ai-sdk/openai
 ```typescript
 import { calculateBleu, calculateCoherence } from 'eval-kit';
 
-// BLEU Score for translation quality
+// BLEU score for translation quality
 const bleuResult = calculateBleu(
   'The cat sits on the mat',
   ['The cat is on the mat']
 );
-console.log(bleuResult.score); // 0.7598
+console.log(bleuResult.score); // 75.98
 
-// Coherence for text quality
+// Coherence for text flow
 const coherenceResult = calculateCoherence(
   'The cat sat on the mat. It was comfortable.'
 );
-console.log(coherenceResult.score); // 0.6543
+console.log(coherenceResult.score); // 65.43
 ```
 
 ### AI-Powered Evaluation
@@ -58,21 +57,34 @@ const result = await evaluator.evaluate({
 });
 
 console.log(result.score);    // 95
-console.log(result.feedback); // Detailed feedback
+console.log(result.feedback); // "Excellent fluency..."
 ```
 
 ### Batch Evaluation
 
 ```typescript
-import { BatchEvaluator, createAIContentEvaluator } from 'eval-kit';
+import { anthropic } from '@ai-sdk/anthropic';
+import { BatchEvaluator, Evaluator } from 'eval-kit';
 
-const batchEvaluator = new BatchEvaluator({
-  evaluators: [createAIContentEvaluator({ model, contentType: 'article' })],
-  concurrency: 5,
-  streamExport: { format: 'csv', destination: './results.csv' },
+const evaluator = new Evaluator({
+  name: 'quality',
+  model: anthropic('claude-3-5-haiku-20241022'),
+  evaluationPrompt: 'Rate the quality of this text from 1-10.',
+  scoreConfig: { type: 'numeric', min: 1, max: 10 },
 });
 
-await batchEvaluator.evaluate({ filePath: './data.json' });
+const batchEvaluator = new BatchEvaluator({
+  evaluators: [evaluator],
+  concurrency: 5,
+  onResult: (result) => console.log(`Row ${result.rowId}: ${result.results[0].score}`),
+});
+
+const result = await batchEvaluator.evaluate({ filePath: './data.csv' });
+
+await batchEvaluator.export({
+  format: 'csv',
+  destination: './results.csv',
+});
 ```
 
 ## Documentation
@@ -80,9 +92,9 @@ await batchEvaluator.evaluate({ filePath: './data.json' });
 | Guide | Description |
 |-------|-------------|
 | [Metrics](./docs/METRICS.md) | BLEU, TER, BERTScore, Coherence, Perplexity |
-| [Evaluator](./docs/EVALUATOR.md) | AI-powered evaluation, scoring |
-| [Batch Evaluation](./docs/BATCH_EVALUATION_GUIDE.md) | Concurrent processing, progress tracking, state management |
-| [Export](./docs/EXPORT_GUIDE.md) | CSV, JSON, webhook exports |
+| [Evaluator](./docs/EVALUATOR.md) | AI-powered evaluation and scoring |
+| [Batch Evaluation](./docs/BATCH_EVALUATION_GUIDE.md) | Concurrent processing, progress tracking |
+| [Export](./docs/EXPORT_GUIDE.md) | CSV and JSON export options |
 
 ## Supported LLM Providers
 
