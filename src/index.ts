@@ -1,7 +1,5 @@
 /**
  * eval-kit: TypeScript SDK for content evaluation
- *
- * A lightweight SDK for evaluating content quality.
  */
 
 // Metrics

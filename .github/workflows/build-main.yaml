@@ -1,0 +1,79 @@
+name: Build Main
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GITHUB_TOKEN: ${{ secrets.LOVEHOLIDAYS_BUILD_PAT }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout [main]
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check changesets
+        id: changesets
+        run: |
+          pnpm changeset status --output status.json || true
+          if [ -f status.json ] && [ "$(cat status.json | jq '.releases | length')" -gt 0 ]; then
+            echo "HAS_CHANGESETS=true" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_CHANGESETS=false" >> $GITHUB_OUTPUT
+            echo "No changesets found, skipping publish"
+          fi
+
+      - name: Run tests
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: pnpm test
+
+      - name: Update package versions
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: |
+          pnpm changeset version
+          pnpm install --frozen-lockfile || pnpm install
+
+      - name: Run build
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: pnpm build
+
+      - name: Commit version changes
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: |
+          git config user.name "build-loveholidays"
+          git config user.email "build@loveholidays.com"
+          git diff
+          git add .
+          git commit -m "chore: update package versions"
+          git push origin main
+
+      - name: Authenticate to Google Artifact Registry
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: |
+          npx google-artifactregistry-auth --repo-config=.npmrc --credential-config=.npmrc
+
+      - name: Publish packages
+        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        run: |
+          pnpm changeset publish
+          git push --follow-tags
