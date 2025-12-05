@@ -29,7 +29,7 @@ const getPipeline = async (
 	}
 
 	cachedPipeline = await pipeline("feature-extraction", modelName, {
-		quantized: true,
+		quantized: false,
 	});
 	cachedModelName = modelName;
 
@@ -79,7 +79,7 @@ export const calculateBertScore = async (
 	options: BertScoreOptions = {},
 ): Promise<BertScoreResult> => {
 	const {
-		model = "sentence-transformers/all-MiniLM-L6-v2",
+		model = "Xenova/all-MiniLM-L6-v2",
 		scoreType = "f1",
 	} = options;
 
