@@ -110,10 +110,7 @@ export class ProgressTracker {
 	/**
 	 * Emit progress event
 	 */
-	private emit(
-		type: ProgressEventType,
-		extra?: Partial<ProgressEvent>,
-	): void {
+	private emit(type: ProgressEventType, extra?: Partial<ProgressEvent>): void {
 		if (!this.onProgress) return;
 
 		const avgProcessingTime =
@@ -140,7 +137,8 @@ export class ProgressTracker {
 			successfulRows: this.successfulRows,
 			failedRows: this.failedRows,
 			percentComplete: (this.processedRows / this.totalRows) * 100,
-			averageProcessingTime: avgProcessingTime > 0 ? avgProcessingTime : undefined,
+			averageProcessingTime:
+				avgProcessingTime > 0 ? avgProcessingTime : undefined,
 			estimatedTimeRemaining,
 			estimatedCostUSD,
 			estimatedTokensRemaining,
@@ -183,7 +181,8 @@ export class ProgressTracker {
 			successfulRows: this.successfulRows,
 			failedRows: this.failedRows,
 			percentComplete: (this.processedRows / this.totalRows) * 100,
-			averageProcessingTime: avgProcessingTime > 0 ? avgProcessingTime : undefined,
+			averageProcessingTime:
+				avgProcessingTime > 0 ? avgProcessingTime : undefined,
 			estimatedTimeRemaining,
 			estimatedCostUSD,
 			estimatedTokensRemaining,

@@ -199,8 +199,7 @@ Provide feedback.`);
 		});
 
 		it("should detect nested conditionals", () => {
-			const template =
-				"{{#if a}}{{#if b}}Nested{{/if}}{{/if}}";
+			const template = "{{#if a}}{{#if b}}Nested{{/if}}{{/if}}";
 			const errors = renderer.validate(template);
 
 			expect(errors).toHaveLength(1);

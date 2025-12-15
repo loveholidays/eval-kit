@@ -1,5 +1,5 @@
-import { stringify } from "csv-stringify/sync";
 import { writeFile } from "node:fs/promises";
+import { stringify } from "csv-stringify/sync";
 import type { BatchEvaluationResult, BatchExportConfig } from "../types.js";
 
 export class CsvExporter {
@@ -7,7 +7,13 @@ export class CsvExporter {
 		results: BatchEvaluationResult[],
 		config: BatchExportConfig,
 	): Promise<void> {
-		const { destination, csvOptions = {}, includeFields, excludeFields, filterCondition } = config;
+		const {
+			destination,
+			csvOptions = {},
+			includeFields,
+			excludeFields,
+			filterCondition,
+		} = config;
 
 		// Filter results if condition provided
 		const filteredResults = filterCondition
@@ -58,7 +64,8 @@ export class CsvExporter {
 		// Add input fields
 		flat.candidateText = result.input.candidateText;
 		if (result.input.prompt) flat.prompt = result.input.prompt;
-		if (result.input.referenceText) flat.referenceText = result.input.referenceText;
+		if (result.input.referenceText)
+			flat.referenceText = result.input.referenceText;
 		if (result.input.sourceText) flat.sourceText = result.input.sourceText;
 		if (result.input.contentType) flat.contentType = result.input.contentType;
 		if (result.input.language) flat.language = result.input.language;
@@ -89,9 +96,12 @@ export class CsvExporter {
 				flat[`${prefix}feedback`] = evalResult.feedback;
 
 				if (evalResult.processingStats) {
-					flat[`${prefix}executionTime`] = evalResult.processingStats.executionTime;
+					flat[`${prefix}executionTime`] =
+						evalResult.processingStats.executionTime;
 					if (evalResult.processingStats.tokenUsage) {
-						flat[`${prefix}tokenUsage`] = JSON.stringify(evalResult.processingStats.tokenUsage);
+						flat[`${prefix}tokenUsage`] = JSON.stringify(
+							evalResult.processingStats.tokenUsage,
+						);
 					}
 				}
 				if (evalResult.error) {

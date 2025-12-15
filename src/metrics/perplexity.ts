@@ -1,9 +1,9 @@
 import {
-	AutoTokenizer,
 	AutoModelForCausalLM,
-	Tensor,
-	type PreTrainedTokenizer,
+	AutoTokenizer,
 	type PreTrainedModel,
+	type PreTrainedTokenizer,
+	Tensor,
 } from "@xenova/transformers";
 
 export interface PerplexityOptions {
@@ -27,11 +27,7 @@ let cachedModelName: string | null = null;
 const getModelAndTokenizer = async (
 	modelName: string,
 ): Promise<{ tokenizer: PreTrainedTokenizer; model: PreTrainedModel }> => {
-	if (
-		cachedTokenizer &&
-		cachedModel &&
-		cachedModelName === modelName
-	) {
+	if (cachedTokenizer && cachedModel && cachedModelName === modelName) {
 		return { tokenizer: cachedTokenizer, model: cachedModel };
 	}
 

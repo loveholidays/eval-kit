@@ -14,7 +14,9 @@ export class JsonParser {
 		try {
 			data = JSON.parse(content);
 		} catch (error) {
-			throw new Error(`Failed to parse JSON file: ${error instanceof Error ? error.message : String(error)}`);
+			throw new Error(
+				`Failed to parse JSON file: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 
 		// Extract array from nested path if specified
@@ -24,7 +26,9 @@ export class JsonParser {
 		} else if (Array.isArray(data)) {
 			records = data;
 		} else {
-			throw new Error("JSON file must be an array or specify arrayPath to locate the array");
+			throw new Error(
+				"JSON file must be an array or specify arrayPath to locate the array",
+			);
 		}
 
 		// Validate records are objects

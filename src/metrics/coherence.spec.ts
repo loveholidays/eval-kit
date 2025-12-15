@@ -18,8 +18,7 @@ describe("Coherence Metric", () => {
 		});
 
 		it("should calculate coherence for sentences with some shared vocabulary", () => {
-			const text =
-				"The cat sleeps peacefully. The dog plays energetically.";
+			const text = "The cat sleeps peacefully. The dog plays energetically.";
 			const result = calculateCoherence(text);
 
 			expect(result.sentenceCount).toBe(2);
@@ -40,7 +39,8 @@ describe("Coherence Metric", () => {
 		});
 
 		it("should handle text with completely different content", () => {
-			const text = "Scientists conducted experiments. Architects designed buildings.";
+			const text =
+				"Scientists conducted experiments. Architects designed buildings.";
 			const result = calculateCoherence(text);
 
 			expect(result.sentenceCount).toBe(2);
@@ -122,9 +122,7 @@ describe("Coherence Metric", () => {
 			const result = calculateCoherence(text);
 
 			expect(result.sentenceCount).toBeGreaterThan(4);
-			expect(result.pairwiseSimilarities.length).toBe(
-				result.sentenceCount - 1,
-			);
+			expect(result.pairwiseSimilarities.length).toBe(result.sentenceCount - 1);
 			expect(result.score).toBeGreaterThanOrEqual(0);
 			expect(result.score).toBeLessThanOrEqual(100);
 		});
@@ -135,10 +133,8 @@ describe("Coherence Metric", () => {
 			const result = calculateCoherence(text);
 
 			const expectedAvg =
-				result.pairwiseSimilarities.reduce(
-					(a: number, b: number) => a + b,
-					0,
-				) / result.pairwiseSimilarities.length;
+				result.pairwiseSimilarities.reduce((a: number, b: number) => a + b, 0) /
+				result.pairwiseSimilarities.length;
 			expect(result.averageSimilarity).toBeCloseTo(expectedAvg, 5);
 			expect(result.score).toBeCloseTo(expectedAvg * 100, 1);
 		});

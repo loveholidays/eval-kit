@@ -1,8 +1,5 @@
+import type { FeatureExtractionPipeline, Tensor } from "@xenova/transformers";
 import { cos_sim, pipeline } from "@xenova/transformers";
-import type {
-	FeatureExtractionPipeline,
-	Tensor,
-} from "@xenova/transformers";
 import { tokenizeWords } from "../utils/tokenization.js";
 
 export interface BertScoreOptions {
@@ -78,10 +75,7 @@ export const calculateBertScore = async (
 	reference: string,
 	options: BertScoreOptions = {},
 ): Promise<BertScoreResult> => {
-	const {
-		model = "Xenova/all-MiniLM-L6-v2",
-		scoreType = "f1",
-	} = options;
+	const { model = "Xenova/all-MiniLM-L6-v2", scoreType = "f1" } = options;
 
 	const extractor = await getPipeline(model);
 
@@ -119,7 +113,9 @@ export const calculateBertScore = async (
 			: 0;
 
 	const f1 =
-		precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+		precision + recall > 0
+			? (2 * precision * recall) / (precision + recall)
+			: 0;
 
 	let finalScore = f1;
 	if (scoreType === "precision") {

@@ -137,7 +137,9 @@ export class ConcurrencyManager {
 		const cutoff = now - this.MAX_TIMESTAMP_AGE;
 
 		// Keep only timestamps within the last hour
-		this.requestTimestamps = this.requestTimestamps.filter((ts) => ts >= cutoff);
+		this.requestTimestamps = this.requestTimestamps.filter(
+			(ts) => ts >= cutoff,
+		);
 	}
 
 	/**

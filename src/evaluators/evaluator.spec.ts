@@ -1,4 +1,4 @@
-import { jest, describe, it, expect, beforeEach } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { LanguageModel } from "ai";
 
 // Mock the ai module before importing Evaluator

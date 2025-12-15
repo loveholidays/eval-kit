@@ -224,10 +224,15 @@ export class BatchEvaluator {
 
 					return; // Success, exit retry loop
 				} catch (error) {
-					const errorMessage = error instanceof Error ? error.message : String(error);
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
 
 					// Check if we should retry
-					const shouldRetry = this.shouldRetry(errorMessage, retryCount, maxRetries);
+					const shouldRetry = this.shouldRetry(
+						errorMessage,
+						retryCount,
+						maxRetries,
+					);
 
 					if (shouldRetry) {
 						retryCount++;
@@ -236,7 +241,7 @@ export class BatchEvaluator {
 						// Calculate delay with exponential backoff
 						const baseDelay = this.config.retryConfig?.retryDelay ?? 1000;
 						const delay = this.config.retryConfig?.exponentialBackoff
-							? baseDelay * Math.pow(2, retryCount - 1)
+							? baseDelay * 2 ** (retryCount - 1)
 							: baseDelay;
 
 						await this.sleep(delay);
@@ -261,7 +266,9 @@ export class BatchEvaluator {
 
 						// Stop on error if configured
 						if (this.config.stopOnError) {
-							throw new Error(`Stopping batch evaluation due to error: ${errorMessage}`);
+							throw new Error(
+								`Stopping batch evaluation due to error: ${errorMessage}`,
+							);
 						}
 
 						return; // Exit retry loop
@@ -290,7 +297,10 @@ export class BatchEvaluator {
 			if (timeout) {
 				return Promise.race([
 					evaluator.evaluate(input),
-					this.timeoutPromise(timeout, `Evaluator ${evaluator.name} timed out after ${timeout}ms`),
+					this.timeoutPromise(
+						timeout,
+						`Evaluator ${evaluator.name} timed out after ${timeout}ms`,
+					),
 				]);
 			}
 			return evaluator.evaluate(input);
@@ -358,7 +368,8 @@ export class BatchEvaluator {
 	 */
 	private buildResult(): BatchResult {
 		const endTime = new Date().toISOString();
-		const durationMs = new Date(endTime).getTime() - new Date(this.startTime).getTime();
+		const durationMs =
+			new Date(endTime).getTime() - new Date(this.startTime).getTime();
 
 		const successfulRows = this.results.filter((r) => !r.error).length;
 		const failedRows = this.results.filter((r) => r.error).length;
@@ -367,14 +378,19 @@ export class BatchEvaluator {
 		const processingTimes = this.results.map((r) => r.durationMs);
 		const averageProcessingTime =
 			processingTimes.length > 0
-				? processingTimes.reduce((sum, t) => sum + t, 0) / processingTimes.length
+				? processingTimes.reduce((sum, t) => sum + t, 0) /
+					processingTimes.length
 				: 0;
 
 		// Calculate total tokens
 		const totalTokensUsed = this.results.reduce(
 			(sum, r) =>
 				sum +
-				r.results.reduce((rSum, evalResult) => rSum + (evalResult.processingStats.tokenUsage?.totalTokens ?? 0), 0),
+				r.results.reduce(
+					(rSum, evalResult) =>
+						rSum + (evalResult.processingStats.tokenUsage?.totalTokens ?? 0),
+					0,
+				),
 			0,
 		);
 
@@ -390,7 +406,8 @@ export class BatchEvaluator {
 			summary: {
 				averageProcessingTime,
 				totalTokensUsed: totalTokensUsed > 0 ? totalTokensUsed : undefined,
-				errorRate: this.results.length > 0 ? failedRows / this.results.length : 0,
+				errorRate:
+					this.results.length > 0 ? failedRows / this.results.length : 0,
 			},
 		};
 	}
