@@ -34,3 +34,5 @@ gha-creds-*.json
 status.json
 
 examples/
+
+.claude/
