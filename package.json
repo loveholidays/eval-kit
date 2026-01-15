@@ -28,6 +28,14 @@
     "release": "pnpm build && changeset publish",
     "prepublishOnly": "pnpm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loveholidays/eval-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loveholidays/eval-kit/issues"
+  },
+  "homepage": "https://github.com/loveholidays/eval-kit#readme",
   "keywords": [
     "evaluation",
     "content",
@@ -41,10 +49,6 @@
   ],
   "author": "",
   "license": "ISC",
-  "publishConfig": {
-    "access": "restricted",
-    "registry": "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/node-packages/"
-  },
   "sideEffects": false,
   "packageManager": "pnpm@10.20.0",
   "files": [
