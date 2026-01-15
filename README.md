@@ -111,7 +111,7 @@ pnpm lint       # Lint code
 
 ## Publishing
 
-This package uses [Changesets](https://github.com/changesets/changesets) for version management and is published to the loveholidays Google Artifact Registry.
+This package uses [Changesets](https://github.com/changesets/changesets) for version management and is published to the npm registry.
 
 ### Creating a Release
 
