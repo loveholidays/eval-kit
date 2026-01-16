@@ -48,7 +48,7 @@
     "bert-score"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "sideEffects": false,
   "packageManager": "pnpm@10.20.0",
   "files": [
