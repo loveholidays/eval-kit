@@ -150,4 +150,4 @@ pnpm changeset publish  # Publish to registry
 
 ## License
 
-ISC
+MIT
