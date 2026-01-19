@@ -13,6 +13,9 @@ coverage/
 .env.local
 .env.*.local
 
+# npm credentials
+.npmrc
+
 # IDE
 .vscode/
 .idea/
