@@ -1,10 +1,9 @@
-# @loveholidays/eval-kit
+---
+"@loveholidays/eval-kit": major
+---
 
-## 1.0.0
+Initial public release of eval-kit: TypeScript SDK for content evaluation
 
-### Major Changes
-
-- Initial public release of eval-kit: TypeScript SDK for content evaluation
 - Core evaluation framework with support for multiple LLM providers (via Vercel AI SDK)
 - Built-in evaluators: coherence, relevance, answer similarity, factual consistency
 - Built-in metrics: BLEU score, BERT score, Levenshtein distance
