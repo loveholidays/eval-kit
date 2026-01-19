@@ -1,4 +1,4 @@
-import { tokenizeWords, tokenizeSentences } from "./tokenization";
+import { tokenizeSentences, tokenizeWords } from "./tokenization";
 
 describe("Tokenization Utils", () => {
 	describe("tokenizeWords", () => {

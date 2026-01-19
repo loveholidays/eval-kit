@@ -1,6 +1,6 @@
 {
   "name": "@loveholidays/eval-kit",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "description": "TypeScript SDK for content evaluation",
   "type": "module",
   "main": "dist/index.cjs",
@@ -28,6 +28,14 @@
     "release": "pnpm build && changeset publish",
     "prepublishOnly": "pnpm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loveholidays/eval-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loveholidays/eval-kit/issues"
+  },
+  "homepage": "https://github.com/loveholidays/eval-kit#readme",
   "keywords": [
     "evaluation",
     "content",
@@ -40,10 +48,9 @@
     "bert-score"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "publishConfig": {
-    "access": "restricted",
-    "registry": "https://europe-west2-npm.pkg.dev/loveholidays-ci-cd/npm-remote/"
+    "access": "public"
   },
   "sideEffects": false,
   "packageManager": "pnpm@10.20.0",

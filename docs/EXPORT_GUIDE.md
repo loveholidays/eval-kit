@@ -470,9 +470,3 @@ await batchEvaluator.export({
 - Check for errors in `onProgress` events
 - Verify disk space available
 - Make sure `onResult` isn't throwing errors
-
-## See Also
-
-- [Batch Evaluation Guide](./BATCH_EVALUATION_GUIDE.md)
-- [Security Guide](../SECURITY.md)
-- [Examples](../examples/)

@@ -1,16 +1,18 @@
 # @loveholidays/eval-kit
 
-## 1.1.1
+## 1.0.0
 
-### Patch Changes
+### Major Changes
 
-- 426b130: Fix CI/CD workflow authentication for Google Artifact Registry publishing
+- ea02e58: Initial public release of eval-kit
 
-  - Use Workload Identity Federation instead of static tokens
-  - Align with webmono CI patterns for consistent authentication
+  This is the first public release of eval-kit, a TypeScript SDK for content evaluation.
 
-## 1.1.0
+  **Features:**
 
-### Minor Changes
-
-- d68bb59: Add GitHub CI/CD workflows for automated testing and publishing
+  - Traditional metrics (BLEU, TER, BERTScore, Coherence, Perplexity)
+  - AI-powered evaluation with LLM-based evaluators (via Vercel AI SDK)
+  - Batch processing with concurrent execution and progress tracking
+  - CSV and JSON export capabilities
+  - Full TypeScript support with comprehensive type definitions
+  - Support for multiple LLM providers (OpenAI, Anthropic, Google, Mistral, Groq, Cohere)

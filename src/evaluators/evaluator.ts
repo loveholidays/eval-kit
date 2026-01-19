@@ -1,9 +1,9 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import type {
+	EvaluationInput,
 	EvaluatorConfig,
 	EvaluatorResult,
-	EvaluationInput,
 } from "../types/evaluator.js";
 import { TemplateRenderer } from "../utils/template-engine.js";
 
@@ -64,8 +64,11 @@ export class Evaluator {
 				presencePenalty: this.modelSettings?.presencePenalty,
 				frequencyPenalty: this.modelSettings?.frequencyPenalty,
 				seed: this.modelSettings?.seed,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			} as any)) as unknown as { object: { score: number | string; feedback: string }; usage: unknown };
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any)) as unknown as {
+				object: { score: number | string; feedback: string };
+				usage: unknown;
+			};
 
 			const executionTime = Date.now() - startTime;
 			const tokenUsage = this.extractTokenUsage(result.usage);
@@ -82,8 +85,12 @@ export class Evaluator {
 			};
 		} catch (error) {
 			const executionTime = Date.now() - startTime;
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			const errorDetails = error instanceof Error && 'cause' in error ? String(error.cause) : undefined;
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			const errorDetails =
+				error instanceof Error && "cause" in error
+					? String(error.cause)
+					: undefined;
 
 			return {
 				evaluatorName: this.name,
@@ -93,7 +100,9 @@ export class Evaluator {
 				processingStats: {
 					executionTime,
 				},
-				error: errorDetails ? `${errorMessage} (${errorDetails})` : errorMessage,
+				error: errorDetails
+					? `${errorMessage} (${errorDetails})`
+					: errorMessage,
 			};
 		}
 	}
@@ -112,16 +121,27 @@ export class Evaluator {
 
 	private extractTokenUsage(
 		usage: unknown,
-	): { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined {
+	):
+		| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+		| undefined {
 		if (!usage) return undefined;
 		return {
-			inputTokens: (usage as Record<string, unknown>).inputTokens as number | undefined,
-			outputTokens: (usage as Record<string, unknown>).outputTokens as number | undefined,
-			totalTokens: (usage as Record<string, unknown>).totalTokens as number | undefined,
+			inputTokens: (usage as Record<string, unknown>).inputTokens as
+				| number
+				| undefined,
+			outputTokens: (usage as Record<string, unknown>).outputTokens as
+				| number
+				| undefined,
+			totalTokens: (usage as Record<string, unknown>).totalTokens as
+				| number
+				| undefined,
 		};
 	}
 
-	private createSchema(): z.ZodObject<{ score: z.ZodTypeAny; feedback: z.ZodString }> {
+	private createSchema(): z.ZodObject<{
+		score: z.ZodTypeAny;
+		feedback: z.ZodString;
+	}> {
 		if (this.scoreConfig.type === "numeric") {
 			const { min, max, float } = this.scoreConfig;
 			let scoreSchema: z.ZodNumber = z.number().min(min).max(max);

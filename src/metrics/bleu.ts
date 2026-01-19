@@ -1,7 +1,4 @@
-import {
-	calculateNgramPrecision,
-	generateNgrams,
-} from "../utils/ngram.js";
+import { calculateNgramPrecision, generateNgrams } from "../utils/ngram.js";
 import { tokenizeWords } from "../utils/tokenization.js";
 
 export interface BleuOptions {
@@ -36,10 +33,7 @@ export const calculateBleu = (
 		const candidateNgrams = generateNgrams(candidateTokens, n);
 		const referenceNgrams = generateNgrams(referenceTokens, n);
 
-		const precision = calculateNgramPrecision(
-			candidateNgrams,
-			referenceNgrams,
-		);
+		const precision = calculateNgramPrecision(candidateNgrams, referenceNgrams);
 
 		const smoothedPrecision = Math.max(precision, smoothing);
 		precisions.push(smoothedPrecision);

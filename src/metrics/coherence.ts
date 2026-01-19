@@ -1,6 +1,6 @@
-import { tokenizeSentences, tokenizeWords } from "../utils/tokenization.js";
-import { calculateIDF, calculateTFIDF } from "../utils/tfidf.js";
 import { cosineSimilarity } from "../utils/similarity.js";
+import { calculateIDF, calculateTFIDF } from "../utils/tfidf.js";
+import { tokenizeSentences, tokenizeWords } from "../utils/tokenization.js";
 
 export interface CoherenceOptions {
 	minSentences?: number;

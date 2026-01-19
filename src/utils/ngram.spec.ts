@@ -1,8 +1,4 @@
-import {
-	generateNgrams,
-	countNgrams,
-	calculateNgramPrecision,
-} from "./ngram";
+import { calculateNgramPrecision, countNgrams, generateNgrams } from "./ngram";
 
 describe("N-gram Utils", () => {
 	describe("generateNgrams", () => {

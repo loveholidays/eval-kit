@@ -20,11 +20,12 @@ export class JsonExporter {
 			: results;
 
 		// Apply field filtering
-		const finalResults = includeFields || excludeFields
-			? filteredResults.map((result) =>
-					this.applyFieldFilters(result, includeFields, excludeFields),
-				)
-			: filteredResults;
+		const finalResults =
+			includeFields || excludeFields
+				? filteredResults.map((result) =>
+						this.applyFieldFilters(result, includeFields, excludeFields),
+					)
+				: filteredResults;
 
 		// Build output object
 		const output = jsonOptions.includeMetadata

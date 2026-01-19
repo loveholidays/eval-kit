@@ -1,14 +1,10 @@
-import { parse } from "csv-parse/sync";
 import { readFile } from "node:fs/promises";
+import { parse } from "csv-parse/sync";
 import type { BatchInputFileConfig, BatchInputRow } from "../types.js";
 
 export class CsvParser {
 	async parse(config: BatchInputFileConfig): Promise<BatchInputRow[]> {
-		const {
-			filePath,
-			csvOptions = {},
-			fieldMapping,
-		} = config;
+		const { filePath, csvOptions = {}, fieldMapping } = config;
 
 		// Read file
 		const encoding = csvOptions.encoding ?? "utf-8";
@@ -28,7 +24,10 @@ export class CsvParser {
 		// Map records to BatchInputRow
 		return records.map((record, index) => {
 			// Build the required field
-			const candidateText = this.getField(record, fieldMapping?.candidateText ?? "candidateText");
+			const candidateText = this.getField(
+				record,
+				fieldMapping?.candidateText ?? "candidateText",
+			);
 
 			// Build optional fields
 			let id: string;
@@ -101,7 +100,10 @@ export class CsvParser {
 		return value;
 	}
 
-	private getOptionalField(record: Record<string, string>, fieldName: string): string | undefined {
+	private getOptionalField(
+		record: Record<string, string>,
+		fieldName: string,
+	): string | undefined {
 		const value = record[fieldName];
 		if (value === undefined || value === null || value === "") {
 			return undefined;

@@ -11,9 +11,9 @@ A TypeScript SDK for evaluating content quality using traditional metrics and AI
 ## Installation
 
 ```bash
-npm install eval-kit
+npm install @loveholidays/eval-kit
 # or
-pnpm add eval-kit
+pnpm add @loveholidays/eval-kit
 ```
 
 For AI evaluation, you'll also need an AI SDK provider:
@@ -28,7 +28,7 @@ npm install @ai-sdk/openai
 ### Traditional Metrics
 
 ```typescript
-import { calculateBleu, calculateCoherence } from 'eval-kit';
+import { calculateBleu, calculateCoherence } from '@loveholidays/eval-kit';
 
 // BLEU score for translation quality
 const bleuResult = calculateBleu(
@@ -48,7 +48,7 @@ console.log(coherenceResult.score); // 65.43
 
 ```typescript
 import { openai } from '@ai-sdk/openai';
-import { Evaluator } from 'eval-kit';
+import { Evaluator } from '@loveholidays/eval-kit';
 
 const evaluator = Evaluator.create('fluency', openai('gpt-4'));
 
@@ -64,7 +64,7 @@ console.log(result.feedback); // "Excellent fluency..."
 
 ```typescript
 import { anthropic } from '@ai-sdk/anthropic';
-import { BatchEvaluator, Evaluator } from 'eval-kit';
+import { BatchEvaluator, Evaluator } from '@loveholidays/eval-kit';
 
 const evaluator = new Evaluator({
   name: 'quality',
@@ -111,7 +111,7 @@ pnpm lint       # Lint code
 
 ## Publishing
 
-This package uses [Changesets](https://github.com/changesets/changesets) for version management and is published to the loveholidays Google Artifact Registry.
+This package uses [Changesets](https://github.com/changesets/changesets) for version management and is published to the npm registry.
 
 ### Creating a Release
 
@@ -127,7 +127,7 @@ This package uses [Changesets](https://github.com/changesets/changesets) for ver
    - Detect changesets
    - Bump the version in `package.json`
    - Update `CHANGELOG.md`
-   - Publish to Google Artifact Registry
+   - Publish to [npm registry](https://www.npmjs.com/package/@loveholidays/eval-kit)
    - Push git tags
 
 ### Manual Publishing
@@ -150,4 +150,4 @@ pnpm changeset publish  # Publish to registry
 
 ## License
 
-ISC
+MIT

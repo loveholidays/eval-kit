@@ -51,10 +51,7 @@ describe("BERTScore Metric", () => {
 	});
 
 	it("should return all score types", async () => {
-		const result = await calculateBertScore(
-			"Hello world",
-			"Hi world",
-		);
+		const result = await calculateBertScore("Hello world", "Hi world");
 
 		expect(result).toHaveProperty("score");
 		expect(result).toHaveProperty("precision");
@@ -64,11 +61,9 @@ describe("BERTScore Metric", () => {
 	});
 
 	it("should respect scoreType option", async () => {
-		const f1Result = await calculateBertScore(
-			"Hello world",
-			"Hi world",
-			{ scoreType: "f1" },
-		);
+		const f1Result = await calculateBertScore("Hello world", "Hi world", {
+			scoreType: "f1",
+		});
 		expect(f1Result.score).toBe(f1Result.f1);
 
 		const precisionResult = await calculateBertScore(
@@ -78,11 +73,9 @@ describe("BERTScore Metric", () => {
 		);
 		expect(precisionResult.score).toBe(precisionResult.precision);
 
-		const recallResult = await calculateBertScore(
-			"Hello world",
-			"Hi world",
-			{ scoreType: "recall" },
-		);
+		const recallResult = await calculateBertScore("Hello world", "Hi world", {
+			scoreType: "recall",
+		});
 		expect(recallResult.score).toBe(recallResult.recall);
 	});
 
@@ -100,11 +93,9 @@ describe("BERTScore Metric", () => {
 	});
 
 	it("should handle different models", async () => {
-		const result = await calculateBertScore(
-			"Hello world",
-			"Hi world",
-			{ model: "sentence-transformers/all-MiniLM-L6-v2" },
-		);
+		const result = await calculateBertScore("Hello world", "Hi world", {
+			model: "sentence-transformers/all-MiniLM-L6-v2",
+		});
 
 		expect(result.modelUsed).toBe("sentence-transformers/all-MiniLM-L6-v2");
 		expect(result.score).toBeGreaterThan(0);
