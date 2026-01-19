@@ -57,6 +57,11 @@
   "files": [
     "dist"
   ],
+  "pnpm": {
+    "overrides": {
+      "diff": ">=8.0.3"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.3.7",
     "@changesets/cli": "^2.29.8",
