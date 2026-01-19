@@ -75,7 +75,7 @@ export class Evaluator {
 
 			return {
 				evaluatorName: this.name,
-				model: this.model.modelId,
+				model: (this.model as { modelId?: string }).modelId,
 				score: result.object.score,
 				feedback: result.object.feedback,
 				processingStats: {
@@ -94,7 +94,7 @@ export class Evaluator {
 
 			return {
 				evaluatorName: this.name,
-				model: this.model.modelId,
+				model: (this.model as { modelId?: string }).modelId,
 				score: 0,
 				feedback: `Evaluation failed: ${errorMessage}`,
 				processingStats: {
