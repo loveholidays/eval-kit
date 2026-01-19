@@ -1,6 +1,6 @@
 {
   "name": "@loveholidays/eval-kit",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "TypeScript SDK for content evaluation",
   "type": "module",
   "main": "dist/index.cjs",
