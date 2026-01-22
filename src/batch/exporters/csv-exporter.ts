@@ -2,6 +2,16 @@ import { writeFile } from "node:fs/promises";
 import { stringify } from "csv-stringify/sync";
 import type { BatchEvaluationResult, BatchExportConfig } from "../types.js";
 
+const STANDARD_INPUT_FIELDS = new Set([
+	"candidateText",
+	"prompt",
+	"referenceText",
+	"sourceText",
+	"contentType",
+	"language",
+	"id",
+]);
+
 export class CsvExporter {
 	async export(
 		results: BatchEvaluationResult[],
@@ -61,59 +71,90 @@ export class CsvExporter {
 			error: result.error ?? "",
 		};
 
-		// Add input fields
-		flat.candidateText = result.input.candidateText;
-		if (result.input.prompt) flat.prompt = result.input.prompt;
-		if (result.input.referenceText)
-			flat.referenceText = result.input.referenceText;
-		if (result.input.sourceText) flat.sourceText = result.input.sourceText;
-		if (result.input.contentType) flat.contentType = result.input.contentType;
-		if (result.input.language) flat.language = result.input.language;
+		this.addStandardInputFields(flat, result.input);
+		this.addAdditionalInputFields(flat, result.input);
+		this.addEvaluatorResults(flat, result.results, shouldFlatten);
 
-		// Add additional input fields
-		for (const [key, value] of Object.entries(result.input)) {
-			if (
-				key !== "candidateText" &&
-				key !== "prompt" &&
-				key !== "referenceText" &&
-				key !== "sourceText" &&
-				key !== "contentType" &&
-				key !== "language" &&
-				key !== "id"
-			) {
+		return flat;
+	}
+
+	/**
+	 * Add standard input fields to the flattened object
+	 */
+	private addStandardInputFields(
+		flat: Record<string, unknown>,
+		input: BatchEvaluationResult["input"],
+	): void {
+		flat.candidateText = input.candidateText;
+		if (input.prompt) flat.prompt = input.prompt;
+		if (input.referenceText) flat.referenceText = input.referenceText;
+		if (input.sourceText) flat.sourceText = input.sourceText;
+		if (input.contentType) flat.contentType = input.contentType;
+		if (input.language) flat.language = input.language;
+	}
+
+	/**
+	 * Add additional input fields to the flattened object
+	 */
+	private addAdditionalInputFields(
+		flat: Record<string, unknown>,
+		input: BatchEvaluationResult["input"],
+	): void {
+		for (const [key, value] of Object.entries(input)) {
+			if (!STANDARD_INPUT_FIELDS.has(key)) {
 				flat[`input_${key}`] = this.serializeValue(value);
 			}
 		}
+	}
 
-		// Add evaluator results
-		if (shouldFlatten) {
-			for (let i = 0; i < result.results.length; i++) {
-				const evalResult = result.results[i];
-				const prefix = result.results.length === 1 ? "" : `eval${i + 1}_`;
-
-				flat[`${prefix}evaluatorName`] = evalResult.evaluatorName;
-				flat[`${prefix}score`] = evalResult.score;
-				flat[`${prefix}feedback`] = evalResult.feedback;
-
-				if (evalResult.processingStats) {
-					flat[`${prefix}executionTime`] =
-						evalResult.processingStats.executionTime;
-					if (evalResult.processingStats.tokenUsage) {
-						flat[`${prefix}tokenUsage`] = JSON.stringify(
-							evalResult.processingStats.tokenUsage,
-						);
-					}
-				}
-				if (evalResult.error) {
-					flat[`${prefix}error`] = evalResult.error;
-				}
-			}
-		} else {
-			// Keep results as JSON string
-			flat.results = JSON.stringify(result.results);
+	/**
+	 * Add evaluator results to the flattened object
+	 */
+	private addEvaluatorResults(
+		flat: Record<string, unknown>,
+		results: BatchEvaluationResult["results"],
+		shouldFlatten: boolean,
+	): void {
+		if (!shouldFlatten) {
+			flat.results = JSON.stringify(results);
+			return;
 		}
 
-		return flat;
+		for (let i = 0; i < results.length; i++) {
+			const evalResult = results[i];
+			const prefix = results.length === 1 ? "" : `eval${i + 1}_`;
+
+			flat[`${prefix}evaluatorName`] = evalResult.evaluatorName;
+			flat[`${prefix}score`] = evalResult.score;
+			flat[`${prefix}feedback`] = evalResult.feedback;
+
+			this.addProcessingStats(flat, evalResult, prefix);
+
+			if (evalResult.error) {
+				flat[`${prefix}error`] = evalResult.error;
+			}
+		}
+	}
+
+	/**
+	 * Add processing stats to the flattened object
+	 */
+	private addProcessingStats(
+		flat: Record<string, unknown>,
+		evalResult: BatchEvaluationResult["results"][number],
+		prefix: string,
+	): void {
+		if (!evalResult.processingStats) {
+			return;
+		}
+
+		flat[`${prefix}executionTime`] = evalResult.processingStats.executionTime;
+
+		if (evalResult.processingStats.tokenUsage) {
+			flat[`${prefix}tokenUsage`] = JSON.stringify(
+				evalResult.processingStats.tokenUsage,
+			);
+		}
 	}
 
 	/**
