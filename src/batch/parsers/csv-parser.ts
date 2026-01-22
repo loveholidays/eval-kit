@@ -4,97 +4,128 @@ import type { BatchInputFileConfig, BatchInputRow } from "../types.js";
 
 export class CsvParser {
 	async parse(config: BatchInputFileConfig): Promise<BatchInputRow[]> {
-		const { filePath, csvOptions = {}, fieldMapping } = config;
+		const records = await this.parseRecordsFromFile(config);
+		return records.map((record, index) =>
+			this.mapRecordToRow(record, index, config.fieldMapping),
+		);
+	}
 
-		// Read file
+	/**
+	 * Read and parse CSV file into records
+	 */
+	private async parseRecordsFromFile(
+		config: BatchInputFileConfig,
+	): Promise<Record<string, string>[]> {
+		const { filePath, csvOptions = {} } = config;
+
 		const encoding = csvOptions.encoding ?? "utf-8";
 		const content = await readFile(filePath, { encoding });
 
-		// Parse CSV
-		const records = parse(content, {
+		return parse(content, {
 			delimiter: csvOptions.delimiter ?? ",",
 			quote: csvOptions.quote ?? '"',
 			escape: csvOptions.escape ?? '"',
 			columns: csvOptions.headers ?? true,
 			skip_empty_lines: csvOptions.skipEmptyLines ?? true,
 			trim: true,
-			cast: false, // Keep all values as strings for now
+			cast: false,
 		}) as unknown as Record<string, string>[];
+	}
 
-		// Map records to BatchInputRow
-		return records.map((record, index) => {
-			// Build the required field
-			const candidateText = this.getField(
-				record,
-				fieldMapping?.candidateText ?? "candidateText",
-			);
+	/**
+	 * Map a CSV record to a BatchInputRow
+	 */
+	private mapRecordToRow(
+		record: Record<string, string>,
+		index: number,
+		fieldMapping?: BatchInputFileConfig["fieldMapping"],
+	): BatchInputRow {
+		const candidateText = this.getField(
+			record,
+			fieldMapping?.candidateText ?? "candidateText",
+		);
 
-			// Build optional fields
-			let id: string;
-			if (fieldMapping?.id) {
-				id = this.getField(record, fieldMapping.id);
-			} else if (record.id) {
-				id = record.id;
-			} else {
-				id = `row-${index}`;
+		const id = this.extractId(record, index, fieldMapping);
+		const referenceText = this.extractOptionalField(
+			record,
+			"referenceText",
+			fieldMapping?.referenceText,
+		);
+		const sourceText = this.extractOptionalField(
+			record,
+			"sourceText",
+			fieldMapping?.sourceText,
+		);
+		const contentType = this.extractOptionalField(
+			record,
+			"contentType",
+			fieldMapping?.contentType,
+		);
+		const language = this.extractOptionalField(
+			record,
+			"language",
+			fieldMapping?.language,
+		);
+
+		const row: BatchInputRow = {
+			candidateText,
+			id,
+			...(referenceText && { referenceText }),
+			...(sourceText && { sourceText }),
+			...(contentType && { contentType }),
+			...(language && { language }),
+		};
+
+		this.addAdditionalFields(row, record);
+
+		return row;
+	}
+
+	/**
+	 * Extract ID field with fallback logic
+	 */
+	private extractId(
+		record: Record<string, string>,
+		index: number,
+		fieldMapping?: BatchInputFileConfig["fieldMapping"],
+	): string {
+		if (fieldMapping?.id) {
+			return this.getField(record, fieldMapping.id);
+		}
+		return record.id || `row-${index}`;
+	}
+
+	/**
+	 * Extract optional field with mapping fallback
+	 */
+	private extractOptionalField(
+		record: Record<string, string>,
+		defaultFieldName: string,
+		mappedFieldName?: string,
+	): string | undefined {
+		if (mappedFieldName) {
+			return this.getOptionalField(record, mappedFieldName);
+		}
+		return this.getOptionalField(record, defaultFieldName);
+	}
+
+	/**
+	 * Add any additional fields from the record to the row
+	 */
+	private addAdditionalFields(
+		row: BatchInputRow,
+		record: Record<string, string>,
+	): void {
+		for (const [key, value] of Object.entries(record)) {
+			if (!(key in row)) {
+				row[key] = value;
 			}
-
-			let referenceText: string | undefined;
-			if (fieldMapping?.referenceText) {
-				const value = this.getOptionalField(record, fieldMapping.referenceText);
-				if (value) referenceText = value;
-			} else if (record.referenceText) {
-				referenceText = record.referenceText;
-			}
-
-			let sourceText: string | undefined;
-			if (fieldMapping?.sourceText) {
-				const value = this.getOptionalField(record, fieldMapping.sourceText);
-				if (value) sourceText = value;
-			} else if (record.sourceText) {
-				sourceText = record.sourceText;
-			}
-
-			let contentType: string | undefined;
-			if (fieldMapping?.contentType) {
-				const value = this.getOptionalField(record, fieldMapping.contentType);
-				if (value) contentType = value;
-			} else if (record.contentType) {
-				contentType = record.contentType;
-			}
-
-			let language: string | undefined;
-			if (fieldMapping?.language) {
-				const value = this.getOptionalField(record, fieldMapping.language);
-				if (value) language = value;
-			} else if (record.language) {
-				language = record.language;
-			}
-
-			// Build the row object
-			const row: BatchInputRow = {
-				candidateText,
-				id,
-				...(referenceText && { referenceText }),
-				...(sourceText && { sourceText }),
-				...(contentType && { contentType }),
-				...(language && { language }),
-			};
-
-			// Include any additional fields
-			for (const [key, value] of Object.entries(record)) {
-				if (!(key in row)) {
-					row[key] = value;
-				}
-			}
-
-			return row;
-		});
+		}
 	}
 
 	private getField(record: Record<string, string>, fieldName: string): string {
 		const value = record[fieldName];
-		if (value === undefined || value === null || value === "") {
+		if (!value) {
 			throw new Error(`Required field '${fieldName}' not found in CSV record`);
 		}
 		return value;
@@ -105,9 +136,6 @@ export class CsvParser {
 		fieldName: string,
 	): string | undefined {
 		const value = record[fieldName];
-		if (value === undefined || value === null || value === "") {
-			return undefined;
-		}
-		return value;
+		return value || undefined;
 	}
 }
