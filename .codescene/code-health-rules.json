@@ -1,0 +1,22 @@
+{
+  "rule_sets": [
+    {
+      "matching_content_path": "**/*.spec.ts",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "**/*.test.ts",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    }
+  ]
+}
