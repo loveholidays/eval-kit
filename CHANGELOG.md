@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.0.2
+
+### Patch Changes
+
+- f4f1cf4: Fix lodash prototype pollution vulnerability (CVE-2025-13465) by forcing lodash >=4.17.23 via pnpm overrides. This addresses a security issue where _.unset and _.omit functions could be exploited to delete methods from global prototypes.
+
 ## 1.0.1
 
 ### Patch Changes
