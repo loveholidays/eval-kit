@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # Required for OIDC
 
 jobs:
   build:
@@ -64,6 +65,5 @@ jobs:
       - name: Publish packages
         if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
         run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_TOKEN }}" >> .npmrc
           pnpm changeset publish
           git push --follow-tags
