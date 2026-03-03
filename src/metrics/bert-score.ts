@@ -1,5 +1,6 @@
 import type { FeatureExtractionPipeline, Tensor } from "@xenova/transformers";
 import { cos_sim, pipeline } from "@xenova/transformers";
+import { withSpan } from "../telemetry.js";
 import { tokenizeWords } from "../utils/tokenization.js";
 
 export interface BertScoreOptions {
@@ -77,60 +78,84 @@ export const calculateBertScore = async (
 ): Promise<BertScoreResult> => {
 	const { model = "Xenova/all-MiniLM-L6-v2", scoreType = "f1" } = options;
 
-	const extractor = await getPipeline(model);
+	return withSpan(
+		"eval-kit.metric.bert_score",
+		{
+			attributes: {
+				"eval_kit.metric.name": "bert_score",
+				"eval_kit.metric.model": model,
+				"eval_kit.metric.score_type": scoreType,
+			},
+		},
+		async (span) => {
+			const wasCached =
+				cachedPipeline !== null && cachedModelName === model;
+			const extractor = await getPipeline(model);
+			if (!wasCached) {
+				span.addEvent("model_loaded", {
+					"eval_kit.metric.model": model,
+				});
+			}
 
-	const candidateTokens = tokenizeWords(candidate);
-	const referenceTokens = tokenizeWords(reference);
+			const candidateTokens = tokenizeWords(candidate);
+			const referenceTokens = tokenizeWords(reference);
 
-	const candidateEmbeddings = await getTokenEmbeddings(
-		candidateTokens,
-		extractor,
+			const candidateEmbeddings = await getTokenEmbeddings(
+				candidateTokens,
+				extractor,
+			);
+			const referenceEmbeddings = await getTokenEmbeddings(
+				referenceTokens,
+				extractor,
+			);
+
+			const precisionSimilarities = computeMaxSimilarities(
+				candidateEmbeddings,
+				referenceEmbeddings,
+			);
+			const recallSimilarities = computeMaxSimilarities(
+				referenceEmbeddings,
+				candidateEmbeddings,
+			);
+
+			const precision =
+				precisionSimilarities.length > 0
+					? precisionSimilarities.reduce(
+							(sum, sim) => sum + sim,
+							0,
+						) / precisionSimilarities.length
+					: 0;
+
+			const recall =
+				recallSimilarities.length > 0
+					? recallSimilarities.reduce((sum, sim) => sum + sim, 0) /
+						recallSimilarities.length
+					: 0;
+
+			const f1 =
+				precision + recall > 0
+					? (2 * precision * recall) / (precision + recall)
+					: 0;
+
+			let finalScore = f1;
+			if (scoreType === "precision") {
+				finalScore = precision;
+			} else if (scoreType === "recall") {
+				finalScore = recall;
+			}
+
+			const result = {
+				score: Math.round(finalScore * 10000) / 100,
+				precision: Math.round(precision * 10000) / 100,
+				recall: Math.round(recall * 10000) / 100,
+				f1: Math.round(f1 * 10000) / 100,
+				modelUsed: model,
+			};
+
+			span.setAttribute("eval_kit.result.score", result.score);
+			return result;
+		},
 	);
-	const referenceEmbeddings = await getTokenEmbeddings(
-		referenceTokens,
-		extractor,
-	);
-
-	const precisionSimilarities = computeMaxSimilarities(
-		candidateEmbeddings,
-		referenceEmbeddings,
-	);
-	const recallSimilarities = computeMaxSimilarities(
-		referenceEmbeddings,
-		candidateEmbeddings,
-	);
-
-	const precision =
-		precisionSimilarities.length > 0
-			? precisionSimilarities.reduce((sum, sim) => sum + sim, 0) /
-				precisionSimilarities.length
-			: 0;
-
-	const recall =
-		recallSimilarities.length > 0
-			? recallSimilarities.reduce((sum, sim) => sum + sim, 0) /
-				recallSimilarities.length
-			: 0;
-
-	const f1 =
-		precision + recall > 0
-			? (2 * precision * recall) / (precision + recall)
-			: 0;
-
-	let finalScore = f1;
-	if (scoreType === "precision") {
-		finalScore = precision;
-	} else if (scoreType === "recall") {
-		finalScore = recall;
-	}
-
-	return {
-		score: Math.round(finalScore * 10000) / 100,
-		precision: Math.round(precision * 10000) / 100,
-		recall: Math.round(recall * 10000) / 100,
-		f1: Math.round(f1 * 10000) / 100,
-		modelUsed: model,
-	};
 };
 
 export const clearBertCache = (): void => {

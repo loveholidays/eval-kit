@@ -83,5 +83,7 @@ export { cosineSimilarity } from "./utils/similarity.js";
 // Evaluator Utilities
 export { TemplateRenderer } from "./utils/template-engine.js";
 export { calculateIDF, calculateTFIDF } from "./utils/tfidf.js";
+// Telemetry
+export { type EvalKitSpan, type WithSpanOptions, withSpan } from "./telemetry.js";
 // Utilities
 export { tokenizeSentences, tokenizeWords } from "./utils/tokenization.js";

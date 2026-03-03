@@ -7,6 +7,7 @@ A TypeScript SDK for evaluating content quality using traditional metrics and AI
 - **Traditional Metrics**: BLEU, TER, BERTScore, Coherence, Perplexity
 - **AI-Powered Evaluation**: LLM-based evaluator with prompt templating (via Vercel AI SDK)
 - **Batch Processing**: Concurrent execution, progress tracking, retry logic, CSV/JSON export
+- **OpenTelemetry Tracing**: Optional distributed tracing with zero overhead when disabled
 
 ## Installation
 
@@ -87,6 +88,31 @@ await batchEvaluator.export({
 });
 ```
 
+### OpenTelemetry Tracing (Optional)
+
+eval-kit has built-in OpenTelemetry support. Install the optional peer dependency to enable distributed tracing with your existing observability stack (Jaeger, Grafana Tempo, Datadog, etc.):
+
+```bash
+npm install @opentelemetry/api @opentelemetry/sdk-trace-node
+```
+
+Configure your OTel SDK as usual — eval-kit will automatically emit spans:
+
+```typescript
+import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { SimpleSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
+
+// Set up OTel before using eval-kit
+const provider = new NodeTracerProvider();
+provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+provider.register();
+
+// Now all eval-kit operations produce traces
+const result = await batchEvaluator.evaluate({ filePath: './data.csv' });
+```
+
+When `@opentelemetry/api` is not installed, all tracing is a no-op with zero overhead. See the [Telemetry Guide](./docs/TELEMETRY.md) for span details and custom evaluator instrumentation.
+
 ## Documentation
 
 | Guide | Description |
@@ -95,6 +121,7 @@ await batchEvaluator.export({
 | [Evaluator](./docs/EVALUATOR.md) | AI-powered evaluation and scoring |
 | [Batch Evaluation](./docs/BATCH_EVALUATION_GUIDE.md) | Concurrent processing, progress tracking |
 | [Export](./docs/EXPORT_GUIDE.md) | CSV and JSON export options |
+| [Telemetry](./docs/TELEMETRY.md) | OpenTelemetry tracing and observability |
 
 ## Supported LLM Providers
 
