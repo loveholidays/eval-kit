@@ -63,12 +63,15 @@ function resolveTracer(): Promise<Tracer> {
 		tracerPromise = (async () => {
 			try {
 				const api = await import("@opentelemetry/api");
-				const version = typeof __EVAL_KIT_VERSION__ !== "undefined"
-					? __EVAL_KIT_VERSION__
-					: "unknown";
+				const version =
+					typeof __EVAL_KIT_VERSION__ !== "undefined"
+						? __EVAL_KIT_VERSION__
+						: "unknown";
 				const tracer = api.trace.getTracer("eval-kit", version);
 				// Wrap the OTel tracer with an explicit adapter at the boundary
-				const wrapSpan = (span: import("@opentelemetry/api").Span): EvalKitSpan => ({
+				const wrapSpan = (
+					span: import("@opentelemetry/api").Span,
+				): EvalKitSpan => ({
 					setAttribute: (key, value) => span.setAttribute(key, value),
 					setStatus: (status) => span.setStatus(status),
 					recordException: (error) => span.recordException(error),
@@ -82,10 +85,8 @@ function resolveTracer(): Promise<Tracer> {
 						options: { attributes?: SpanAttributes },
 						fn: (span: EvalKitSpan) => T,
 					): T {
-						return tracer.startActiveSpan(
-							name,
-							options,
-							(span) => fn(wrapSpan(span)),
+						return tracer.startActiveSpan(name, options, (span) =>
+							fn(wrapSpan(span)),
 						);
 					},
 				};
@@ -157,12 +158,9 @@ export async function withSpan<T>(
 			} catch (error) {
 				span.setStatus({
 					code: SpanStatusCode.ERROR,
-					message:
-						error instanceof Error ? error.message : String(error),
+					message: error instanceof Error ? error.message : String(error),
 				});
-				span.recordException(
-					error instanceof Error ? error : String(error),
-				);
+				span.recordException(error instanceof Error ? error : String(error));
 				throw error;
 			} finally {
 				span.end();

@@ -46,7 +46,7 @@ describe("telemetry noop fallback", () => {
 				span.setAttribute("bool", true);
 				span.setStatus({ code: 1 });
 				span.setStatus({ code: 2, message: "error" });
-				span.addEvent("event", { "detail": "test" });
+				span.addEvent("event", { detail: "test" });
 				span.recordException(new Error("test"));
 				span.recordException("string error");
 				span.end();
@@ -54,17 +54,9 @@ describe("telemetry noop fallback", () => {
 		});
 
 		it("should handle nested withSpan calls with noop tracer", async () => {
-			const result = await withSpan(
-				"parent",
-				{},
-				async () => {
-					return withSpan(
-						"child",
-						{},
-						async () => "nested-result",
-					);
-				},
-			);
+			const result = await withSpan("parent", {}, async () => {
+				return withSpan("child", {}, async () => "nested-result");
+			});
 
 			expect(result).toBe("nested-result");
 		});
@@ -76,15 +68,11 @@ describe("telemetry noop fallback", () => {
 			expect(tracer).toBeDefined();
 
 			// The noop tracer's startActiveSpan should execute the callback
-			const result = tracer.startActiveSpan(
-				"test",
-				{},
-				(span) => {
-					span.setAttribute("key", "value");
-					span.end();
-					return "result";
-				},
-			);
+			const result = tracer.startActiveSpan("test", {}, (span) => {
+				span.setAttribute("key", "value");
+				span.end();
+				return "result";
+			});
 			expect(result).toBe("result");
 		});
 	});
@@ -95,15 +83,11 @@ describe("telemetry noop fallback", () => {
 			const tracer = getCachedTracer();
 			expect(tracer).toBeDefined();
 
-			const result = tracer.startActiveSpan(
-				"test",
-				{},
-				(span) => {
-					span.setAttribute("key", "value");
-					span.end();
-					return "sync-result";
-				},
-			);
+			const result = tracer.startActiveSpan("test", {}, (span) => {
+				span.setAttribute("key", "value");
+				span.end();
+				return "sync-result";
+			});
 			expect(result).toBe("sync-result");
 		});
 

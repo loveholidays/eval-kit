@@ -72,7 +72,7 @@ export class JsonExporter {
 			}
 
 			// Exclude logic
-			if (excludeFields && excludeFields.includes(key)) {
+			if (excludeFields?.includes(key)) {
 				continue;
 			}
 

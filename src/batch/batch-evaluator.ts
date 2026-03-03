@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
 	type EvalKitSpan,
-	SpanStatusCode,
 	getCachedTracer,
+	SpanStatusCode,
 	withSpan,
 } from "../telemetry.js";
 import type { EvaluatorResult, IEvaluator } from "../types/evaluator.js";
@@ -63,15 +63,11 @@ export class BatchEvaluator {
 				// Parse input
 				const allRows = await this.parseInput(inputConfig);
 
-				span.setAttribute(
-					"eval_kit.batch.total_rows",
-					allRows.length,
-				);
+				span.setAttribute("eval_kit.batch.total_rows", allRows.length);
 
 				// Handle startIndex for resuming from a specific position
 				const startIndex = inputConfig.startIndex ?? 0;
-				const rows =
-					startIndex > 0 ? allRows.slice(startIndex) : allRows;
+				const rows = startIndex > 0 ? allRows.slice(startIndex) : allRows;
 
 				// Mark rows before startIndex as already processed (for accurate progress tracking)
 				for (let i = 0; i < startIndex; i++) {
@@ -114,10 +110,7 @@ export class BatchEvaluator {
 					"eval_kit.batch.successful_rows",
 					result.successfulRows,
 				);
-				span.setAttribute(
-					"eval_kit.batch.failed_rows",
-					result.failedRows,
-				);
+				span.setAttribute("eval_kit.batch.failed_rows", result.failedRows);
 				return result;
 			},
 		);
@@ -231,7 +224,9 @@ export class BatchEvaluator {
 
 			await tracer.startActiveSpan(
 				"eval-kit.batch.process_row",
-				{ attributes: { "eval_kit.row.id": rowId, "eval_kit.row.index": index } },
+				{
+					attributes: { "eval_kit.row.id": rowId, "eval_kit.row.index": index },
+				},
 				(span: EvalKitSpan) => this.runRowWithSpan(row, index, span),
 			);
 		});
@@ -248,7 +243,14 @@ export class BatchEvaluator {
 		const rowId = row.id ?? `row-${index}`;
 
 		try {
-			await this.executeRowWithRetry({ inputData, row, index, rowId, span, startTime });
+			await this.executeRowWithRetry({
+				inputData,
+				row,
+				index,
+				rowId,
+				span,
+				startTime,
+			});
 		} catch (error) {
 			spanError = error instanceof Error ? error.message : String(error);
 			span.recordException(error instanceof Error ? error : spanError);
@@ -283,7 +285,16 @@ export class BatchEvaluator {
 				return;
 			} catch (error) {
 				lastError = error;
-				const errorCtx = { error, span: ctx.span, startTime: ctx.startTime, retryCount, maxRetries, rowId: ctx.rowId, index: ctx.index, row: ctx.row };
+				const errorCtx = {
+					error,
+					span: ctx.span,
+					startTime: ctx.startTime,
+					retryCount,
+					maxRetries,
+					rowId: ctx.rowId,
+					index: ctx.index,
+					row: ctx.row,
+				};
 				const shouldRetry = await this.handleRowError(errorCtx);
 				if (!shouldRetry) {
 					ctx.span.setAttribute("eval_kit.row.retry_count", retryCount);
@@ -304,8 +315,13 @@ export class BatchEvaluator {
 		index: number;
 		row: BatchInputRow;
 	}): Promise<boolean> {
-		const errorMessage = ctx.error instanceof Error ? ctx.error.message : String(ctx.error);
-		const shouldRetry = this.shouldRetry(errorMessage, ctx.retryCount, ctx.maxRetries);
+		const errorMessage =
+			ctx.error instanceof Error ? ctx.error.message : String(ctx.error);
+		const shouldRetry = this.shouldRetry(
+			errorMessage,
+			ctx.retryCount,
+			ctx.maxRetries,
+		);
 
 		if (shouldRetry) {
 			const nextAttempt = ctx.retryCount + 1;
@@ -338,7 +354,9 @@ export class BatchEvaluator {
 		this.progressTracker?.recordFailure(durationMs);
 
 		if (this.config.stopOnError) {
-			throw new Error(`Stopping batch evaluation due to error: ${errorMessage}`);
+			throw new Error(
+				`Stopping batch evaluation due to error: ${errorMessage}`,
+			);
 		}
 
 		return false;
@@ -346,7 +364,9 @@ export class BatchEvaluator {
 
 	private calculateRetryDelay(attempt: number): number {
 		const baseDelay = this.config.retryConfig?.retryDelay ?? 1000;
-		return this.config.retryConfig?.exponentialBackoff ? baseDelay * 2 ** (attempt - 1) : baseDelay;
+		return this.config.retryConfig?.exponentialBackoff
+			? baseDelay * 2 ** (attempt - 1)
+			: baseDelay;
 	}
 
 	private async executeRowEvaluation(ctx: {
@@ -434,9 +454,7 @@ export class BatchEvaluator {
 				}
 				// Parallel mode (default)
 				const results = await Promise.all(
-					this.evaluators.map((evaluator) =>
-						evaluateWithTimeout(evaluator),
-					),
+					this.evaluators.map((evaluator) => evaluateWithTimeout(evaluator)),
 				);
 				return results as EvaluatorResult[];
 			},

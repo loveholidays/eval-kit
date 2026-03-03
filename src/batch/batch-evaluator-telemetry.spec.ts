@@ -4,7 +4,7 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { SpanStatusCode, _resetTracer } from "../telemetry.js";
+import { _resetTracer, SpanStatusCode } from "../telemetry.js";
 import type {
 	EvaluationInput,
 	EvaluatorResult,
@@ -69,18 +69,14 @@ describe("BatchEvaluator telemetry", () => {
 		]);
 
 		// Verify parent-child relationships
-		const batchSpan = spans.find(
-			(s) => s.name === "eval-kit.batch.evaluate",
-		)!;
-		const rowSpan = spans.find(
-			(s) => s.name === "eval-kit.batch.process_row",
-		)!;
+		const batchSpan = spans.find((s) => s.name === "eval-kit.batch.evaluate");
+		const rowSpan = spans.find((s) => s.name === "eval-kit.batch.process_row");
 		const evalSpan = spans.find(
 			(s) => s.name === "eval-kit.batch.run_evaluators",
-		)!;
+		);
 
-		expect(rowSpan.parentSpanId).toBe(batchSpan.spanContext().spanId);
-		expect(evalSpan.parentSpanId).toBe(rowSpan.spanContext().spanId);
+		expect(rowSpan?.parentSpanId).toBe(batchSpan?.spanContext().spanId);
+		expect(evalSpan?.parentSpanId).toBe(rowSpan?.spanContext().spanId);
 	});
 
 	it("should set correct attributes on batch span", async () => {
@@ -90,21 +86,18 @@ describe("BatchEvaluator telemetry", () => {
 		});
 
 		await batch.evaluate({
-			data: [
-				{ candidateText: "Row 1" },
-				{ candidateText: "Row 2" },
-			],
+			data: [{ candidateText: "Row 1" }, { candidateText: "Row 2" }],
 		});
 
 		const batchSpan = exporter
 			.getFinishedSpans()
-			.find((s) => s.name === "eval-kit.batch.evaluate")!;
+			.find((s) => s.name === "eval-kit.batch.evaluate");
 
-		expect(batchSpan.attributes["eval_kit.batch.concurrency"]).toBe(3);
-		expect(batchSpan.attributes["eval_kit.batch.total_rows"]).toBe(2);
-		expect(batchSpan.attributes["eval_kit.batch.successful_rows"]).toBe(2);
-		expect(batchSpan.attributes["eval_kit.batch.failed_rows"]).toBe(0);
-		expect(batchSpan.status.code).toBe(SpanStatusCode.OK);
+		expect(batchSpan?.attributes["eval_kit.batch.concurrency"]).toBe(3);
+		expect(batchSpan?.attributes["eval_kit.batch.total_rows"]).toBe(2);
+		expect(batchSpan?.attributes["eval_kit.batch.successful_rows"]).toBe(2);
+		expect(batchSpan?.attributes["eval_kit.batch.failed_rows"]).toBe(0);
+		expect(batchSpan?.status.code).toBe(SpanStatusCode.OK);
 	});
 
 	it("should set correct attributes on process_row span", async () => {
@@ -119,13 +112,15 @@ describe("BatchEvaluator telemetry", () => {
 
 		const rowSpan = exporter
 			.getFinishedSpans()
-			.find((s) => s.name === "eval-kit.batch.process_row")!;
+			.find((s) => s.name === "eval-kit.batch.process_row");
 
-		expect(rowSpan.attributes["eval_kit.row.id"]).toBe("custom-id");
-		expect(rowSpan.attributes["eval_kit.row.index"]).toBe(0);
-		expect(rowSpan.attributes["eval_kit.row.retry_count"]).toBe(0);
-		expect(rowSpan.attributes["eval_kit.row.duration_ms"]).toBeGreaterThanOrEqual(0);
-		expect(rowSpan.status.code).toBe(SpanStatusCode.OK);
+		expect(rowSpan?.attributes["eval_kit.row.id"]).toBe("custom-id");
+		expect(rowSpan?.attributes["eval_kit.row.index"]).toBe(0);
+		expect(rowSpan?.attributes["eval_kit.row.retry_count"]).toBe(0);
+		expect(
+			rowSpan?.attributes["eval_kit.row.duration_ms"],
+		).toBeGreaterThanOrEqual(0);
+		expect(rowSpan?.status.code).toBe(SpanStatusCode.OK);
 	});
 
 	it("should record retry events on process_row span", async () => {
@@ -162,22 +157,20 @@ describe("BatchEvaluator telemetry", () => {
 
 		const rowSpan = exporter
 			.getFinishedSpans()
-			.find((s) => s.name === "eval-kit.batch.process_row")!;
+			.find((s) => s.name === "eval-kit.batch.process_row");
 
 		// Should have 2 retry events
-		const retryEvents = rowSpan.events.filter(
-			(e) => e.name === "retry",
-		);
+		const retryEvents = rowSpan?.events.filter((e) => e.name === "retry");
 		expect(retryEvents).toHaveLength(2);
-		expect(retryEvents[0].attributes!["eval_kit.retry.attempt"]).toBe(1);
-		expect(retryEvents[0].attributes!["eval_kit.retry.error"]).toBe(
+		expect(retryEvents?.[0].attributes?.["eval_kit.retry.attempt"]).toBe(1);
+		expect(retryEvents?.[0].attributes?.["eval_kit.retry.error"]).toBe(
 			"ECONNRESET",
 		);
-		expect(retryEvents[1].attributes!["eval_kit.retry.attempt"]).toBe(2);
+		expect(retryEvents?.[1].attributes?.["eval_kit.retry.attempt"]).toBe(2);
 
 		// Final span should be OK (recovered)
-		expect(rowSpan.attributes["eval_kit.row.retry_count"]).toBe(2);
-		expect(rowSpan.status.code).toBe(SpanStatusCode.OK);
+		expect(rowSpan?.attributes["eval_kit.row.retry_count"]).toBe(2);
+		expect(rowSpan?.status.code).toBe(SpanStatusCode.OK);
 	});
 
 	it("should set error status on process_row span when all retries exhausted", async () => {
@@ -203,11 +196,11 @@ describe("BatchEvaluator telemetry", () => {
 
 		const rowSpan = exporter
 			.getFinishedSpans()
-			.find((s) => s.name === "eval-kit.batch.process_row")!;
+			.find((s) => s.name === "eval-kit.batch.process_row");
 
-		expect(rowSpan.status.code).toBe(SpanStatusCode.ERROR);
-		expect(rowSpan.attributes["eval_kit.result.error"]).toBe("ECONNRESET");
-		expect(rowSpan.attributes["eval_kit.row.retry_count"]).toBe(1);
+		expect(rowSpan?.status.code).toBe(SpanStatusCode.ERROR);
+		expect(rowSpan?.attributes["eval_kit.result.error"]).toBe("ECONNRESET");
+		expect(rowSpan?.attributes["eval_kit.row.retry_count"]).toBe(1);
 	});
 
 	it("should skip parse_input span for in-memory data", async () => {

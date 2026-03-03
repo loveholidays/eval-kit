@@ -4,7 +4,7 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { SpanStatusCode, _resetTracer, withSpan } from "./telemetry.js";
+import { _resetTracer, SpanStatusCode, withSpan } from "./telemetry.js";
 
 // Set up a real OTel SDK so spans are captured
 const exporter = new InMemorySpanExporter();
@@ -96,9 +96,7 @@ describe("telemetry", () => {
 			expect(child).toBeDefined();
 			expect(parent).toBeDefined();
 			// Child's parent span ID should match parent's span ID
-			expect(child!.parentSpanId).toBe(
-				parent!.spanContext().spanId,
-			);
+			expect(child?.parentSpanId).toBe(parent?.spanContext().spanId);
 		});
 	});
 });

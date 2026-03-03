@@ -50,7 +50,7 @@ describe("TF-IDF Utils", () => {
 			const idf = calculateIDF(sentenceTokens);
 
 			// "rare" appears in 1/3 sentences: log((3+1)/(1+1)) = log(2) = 0.693...
-			expect(idf.get("rare")).toBeCloseTo(0.693, 2);
+			expect(idf.get("rare")).toBeCloseTo(Math.LN2, 2);
 		});
 
 		it("should handle empty sentence tokens", () => {

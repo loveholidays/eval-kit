@@ -1,4 +1,4 @@
-import type { FeatureExtractionPipeline, Tensor } from "@xenova/transformers";
+import type { FeatureExtractionPipeline } from "@xenova/transformers";
 import { cos_sim, pipeline } from "@xenova/transformers";
 import { withSpan } from "../telemetry.js";
 import { tokenizeWords } from "../utils/tokenization.js";
@@ -88,8 +88,7 @@ export const calculateBertScore = async (
 			},
 		},
 		async (span) => {
-			const wasCached =
-				cachedPipeline !== null && cachedModelName === model;
+			const wasCached = cachedPipeline !== null && cachedModelName === model;
 			const extractor = await getPipeline(model);
 			if (!wasCached) {
 				span.addEvent("model_loaded", {
@@ -120,10 +119,8 @@ export const calculateBertScore = async (
 
 			const precision =
 				precisionSimilarities.length > 0
-					? precisionSimilarities.reduce(
-							(sum, sim) => sum + sim,
-							0,
-						) / precisionSimilarities.length
+					? precisionSimilarities.reduce((sum, sim) => sum + sim, 0) /
+						precisionSimilarities.length
 					: 0;
 
 			const recall =

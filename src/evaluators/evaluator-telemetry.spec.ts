@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { LanguageModel } from "ai";
 import {
 	InMemorySpanExporter,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { SpanStatusCode, _resetTracer } from "../telemetry.js";
+import type { LanguageModel } from "ai";
+import { _resetTracer, SpanStatusCode } from "../telemetry.js";
 
 // Set up OTel SDK for span capture
 const exporter = new InMemorySpanExporter();
@@ -70,7 +70,9 @@ describe("Evaluator telemetry", () => {
 		expect(span.attributes["eval_kit.result.token_usage.input"]).toBe(100);
 		expect(span.attributes["eval_kit.result.token_usage.output"]).toBe(20);
 		expect(span.attributes["eval_kit.result.token_usage.total"]).toBe(120);
-		expect(span.attributes["eval_kit.result.execution_time_ms"]).toBeGreaterThanOrEqual(0);
+		expect(
+			span.attributes["eval_kit.result.execution_time_ms"],
+		).toBeGreaterThanOrEqual(0);
 
 		expect(span.status.code).toBe(SpanStatusCode.OK);
 	});
@@ -98,7 +100,9 @@ describe("Evaluator telemetry", () => {
 		const span = spans[0];
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.attributes["eval_kit.result.error"]).toBe("API rate limited");
-		expect(span.attributes["eval_kit.result.execution_time_ms"]).toBeGreaterThanOrEqual(0);
+		expect(
+			span.attributes["eval_kit.result.execution_time_ms"],
+		).toBeGreaterThanOrEqual(0);
 
 		// Exception event recorded
 		expect(span.events.length).toBeGreaterThanOrEqual(1);

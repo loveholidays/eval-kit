@@ -69,7 +69,7 @@ const normalizePerplexityToScore = (perplexity: number): number => {
 	return Math.max(0, 10 - (perplexity - 300) / 100);
 };
 
-const generateFeedback = (perplexity: number, score: number): string => {
+const generateFeedback = (perplexity: number, _score: number): string => {
 	if (perplexity < 20) {
 		return `Excellent text quality with very natural, human-like language (perplexity: ${perplexity.toFixed(1)})`;
 	}
@@ -100,10 +100,8 @@ export const calculatePerplexity = async (
 			},
 		},
 		async (span) => {
-			const wasCached =
-				cachedModel !== null && cachedModelName === modelName;
-			const { tokenizer, model } =
-				await getModelAndTokenizer(modelName);
+			const wasCached = cachedModel !== null && cachedModelName === modelName;
+			const { tokenizer, model } = await getModelAndTokenizer(modelName);
 			if (!wasCached) {
 				span.addEvent("model_loaded", {
 					"eval_kit.metric.model": modelName,
@@ -116,9 +114,9 @@ export const calculatePerplexity = async (
 				add_special_tokens: true,
 			});
 
-			const inputIds = Array.from(
-				encoded.input_ids.data as BigInt64Array,
-			).map((x) => Number(x));
+			const inputIds = Array.from(encoded.input_ids.data as BigInt64Array).map(
+				(x) => Number(x),
+			);
 
 			if (inputIds.length <= 1) {
 				span.setAttribute("eval_kit.metric.token_count", inputIds.length);
@@ -129,8 +127,7 @@ export const calculatePerplexity = async (
 					tokenCount: inputIds.length,
 					averageLogProb: 0,
 					modelUsed: modelName,
-					feedback:
-						"Text too short to calculate perplexity meaningfully",
+					feedback: "Text too short to calculate perplexity meaningfully",
 				};
 			}
 
@@ -158,9 +155,7 @@ export const calculatePerplexity = async (
 
 				// Get vocab size from logits shape: [batch_size, seq_len, vocab_size]
 				const vocabSize = logits.dims?.[2] || 50257;
-				const logitsArray = Array.from(
-					logits.data as Float32Array,
-				);
+				const logitsArray = Array.from(logits.data as Float32Array);
 
 				for (let j = 1; j < batch.length; j++) {
 					const startIdx = (j - 1) * vocabSize;
@@ -178,8 +173,7 @@ export const calculatePerplexity = async (
 				if (end >= inputIds.length) break;
 			}
 
-			const averageLogProb =
-				totalTokens > 0 ? totalLogProb / totalTokens : 0;
+			const averageLogProb = totalTokens > 0 ? totalLogProb / totalTokens : 0;
 			const perplexity = Math.exp(-averageLogProb);
 			const score = normalizePerplexityToScore(perplexity);
 
@@ -188,17 +182,13 @@ export const calculatePerplexity = async (
 				"eval_kit.result.perplexity",
 				Math.round(perplexity * 100) / 100,
 			);
-			span.setAttribute(
-				"eval_kit.result.score",
-				Math.round(score * 100) / 100,
-			);
+			span.setAttribute("eval_kit.result.score", Math.round(score * 100) / 100);
 
 			return {
 				perplexity: Math.round(perplexity * 100) / 100,
 				score: Math.round(score * 100) / 100,
 				tokenCount: totalTokens,
-				averageLogProb:
-					Math.round(averageLogProb * 10000) / 10000,
+				averageLogProb: Math.round(averageLogProb * 10000) / 10000,
 				modelUsed: modelName,
 				feedback: generateFeedback(perplexity, score),
 			};
