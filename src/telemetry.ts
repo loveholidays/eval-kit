@@ -53,6 +53,30 @@ const noopTracer: Tracer = {
 	},
 };
 
+// ---------- Global toggle ----------
+
+let telemetryEnabled = false;
+
+/**
+ * Enable or disable eval-kit's OpenTelemetry instrumentation globally.
+ *
+ * When disabled, all tracing functions return no-ops — identical to the
+ * behaviour when `@opentelemetry/api` is not installed. This lets you
+ * use OTel in your application without eval-kit emitting spans.
+ *
+ * Telemetry is **disabled** by default.
+ */
+export function enableTelemetry(enabled: boolean): void {
+	telemetryEnabled = enabled;
+}
+
+/**
+ * Returns the current telemetry enabled state.
+ */
+export function isTelemetryEnabled(): boolean {
+	return telemetryEnabled;
+}
+
 // ---------- Lazy tracer resolution ----------
 
 let resolvedTracer: Tracer | null = null;
@@ -113,18 +137,20 @@ export const SpanStatusCode = {
 
 /**
  * Get the eval-kit tracer (async). Triggers resolution on first call.
+ * Returns the no-op tracer when telemetry is disabled.
  */
 export async function getTracer(): Promise<Tracer> {
+	if (!telemetryEnabled) return noopTracer;
 	return resolveTracer();
 }
 
 /**
  * Get the cached tracer synchronously. Returns no-op if the tracer
- * hasn't been resolved yet (i.e., no prior withSpan/getTracer call).
- * Use this in hot paths where the tracer is guaranteed to be resolved
- * by a parent span.
+ * hasn't been resolved yet (i.e., no prior withSpan/getTracer call)
+ * or if telemetry is disabled.
  */
 export function getCachedTracer(): Tracer {
+	if (!telemetryEnabled) return noopTracer;
 	return resolvedTracer ?? noopTracer;
 }
 
@@ -146,6 +172,8 @@ export async function withSpan<T>(
 	options: WithSpanOptions,
 	fn: (span: EvalKitSpan) => Promise<T>,
 ): Promise<T> {
+	if (!telemetryEnabled) return fn(noopSpan);
+
 	const tracer = await resolveTracer();
 	return tracer.startActiveSpan(
 		name,

@@ -65,6 +65,8 @@ export { Evaluator } from "./evaluators/evaluator.js";
 // Telemetry
 export {
 	type EvalKitSpan,
+	enableTelemetry,
+	isTelemetryEnabled,
 	type WithSpanOptions,
 	withSpan,
 } from "./telemetry.js";

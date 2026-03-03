@@ -1,6 +1,11 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { type EvalKitSpan, getTracer, SpanStatusCode } from "../telemetry.js";
+import {
+	type EvalKitSpan,
+	getTracer,
+	isTelemetryEnabled,
+	SpanStatusCode,
+} from "../telemetry.js";
 import type {
 	EvaluationInput,
 	EvaluatorConfig,
@@ -140,6 +145,7 @@ export class Evaluator {
 			presencePenalty: this.modelSettings?.presencePenalty,
 			frequencyPenalty: this.modelSettings?.frequencyPenalty,
 			seed: this.modelSettings?.seed,
+			experimental_telemetry: { isEnabled: isTelemetryEnabled() },
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} as any)) as unknown as {
 			object: { score: number | string; feedback: string };

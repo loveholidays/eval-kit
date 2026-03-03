@@ -4,7 +4,7 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { _resetTracer, SpanStatusCode } from "../telemetry.js";
+import { _resetTracer, enableTelemetry, SpanStatusCode } from "../telemetry.js";
 
 // Set up OTel SDK
 const exporter = new InMemorySpanExporter();
@@ -26,6 +26,7 @@ describe("bert-score telemetry", () => {
 	beforeEach(() => {
 		exporter.reset();
 		_resetTracer();
+		enableTelemetry(true);
 		clearBertCache();
 		mockPipeline.mockClear();
 		mockCosSim.mockClear();

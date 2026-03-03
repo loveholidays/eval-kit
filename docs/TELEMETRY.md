@@ -31,7 +31,23 @@ For production, replace `ConsoleSpanExporter` with your backend exporter (Jaeger
 
 No code changes needed. eval-kit detects the registered provider and emits spans automatically.
 
-## Zero overhead when disabled
+## Disabling Telemetry
+
+eval-kit's telemetry is **disabled by default**. To opt in:
+
+```typescript
+import { enableTelemetry } from '@loveholidays/eval-kit';
+
+// Enable eval-kit tracing
+enableTelemetry(true);
+
+// Disable again if needed (OTel remains active for the rest of your app)
+enableTelemetry(false);
+```
+
+When disabled, all tracing functions return no-ops with zero overhead — the same behaviour as when `@opentelemetry/api` is not installed.
+
+## Zero overhead when not installed
 
 When `@opentelemetry/api` is not installed, eval-kit uses no-op stubs internally. All tracing calls become empty function calls that are optimized away by the JS engine. There is no performance impact.
 

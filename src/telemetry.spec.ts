@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import {
 	InMemorySpanExporter,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { _resetTracer, SpanStatusCode, withSpan } from "./telemetry.js";
+import {
+	_resetTracer,
+	enableTelemetry,
+	SpanStatusCode,
+	withSpan,
+} from "./telemetry.js";
 
 // Set up a real OTel SDK so spans are captured
 const exporter = new InMemorySpanExporter();
@@ -16,6 +21,7 @@ describe("telemetry", () => {
 	beforeEach(() => {
 		exporter.reset();
 		_resetTracer();
+		enableTelemetry(true);
 	});
 
 	describe("withSpan", () => {
@@ -97,6 +103,39 @@ describe("telemetry", () => {
 			expect(parent).toBeDefined();
 			// Child's parent span ID should match parent's span ID
 			expect(child?.parentSpanId).toBe(parent?.spanContext().spanId);
+		});
+	});
+
+	describe("enableTelemetry", () => {
+		afterEach(() => {
+			// Always re-enable so other tests aren't affected
+			enableTelemetry(true);
+		});
+
+		it("should execute callback but emit no span when disabled", async () => {
+			enableTelemetry(false);
+			_resetTracer();
+
+			const result = await withSpan("test.disabled", {}, async () => "hello");
+
+			expect(result).toBe("hello");
+			expect(exporter.getFinishedSpans()).toHaveLength(0);
+		});
+
+		it("should restore span creation after re-enabling", async () => {
+			enableTelemetry(false);
+			_resetTracer();
+
+			await withSpan("while.disabled", {}, async () => "ignored");
+
+			enableTelemetry(true);
+			_resetTracer();
+
+			await withSpan("after.reenable", {}, async () => "tracked");
+
+			const spans = exporter.getFinishedSpans();
+			expect(spans).toHaveLength(1);
+			expect(spans[0].name).toBe("after.reenable");
 		});
 	});
 });

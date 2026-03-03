@@ -5,7 +5,7 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { _resetTracer, SpanStatusCode } from "../telemetry.js";
+import { _resetTracer, enableTelemetry, SpanStatusCode } from "../telemetry.js";
 import type {
 	EvaluationInput,
 	EvaluatorResult,
@@ -64,6 +64,7 @@ describe("BatchEvaluator telemetry", () => {
 	beforeEach(() => {
 		exporter.reset();
 		_resetTracer();
+		enableTelemetry(true);
 	});
 
 	it("should create span hierarchy: batch → process_row → run_evaluators", async () => {
