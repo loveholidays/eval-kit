@@ -111,7 +111,9 @@ describe("BatchEvaluator telemetry", () => {
 		expect(span.attributes["eval_kit.row.id"]).toBe("custom-id");
 		expect(span.attributes["eval_kit.row.index"]).toBe(0);
 		expect(span.attributes["eval_kit.row.retry_count"]).toBe(0);
-		expect(span.attributes["eval_kit.row.duration_ms"]).toBeGreaterThanOrEqual(0);
+		expect(span.attributes["eval_kit.row.duration_ms"]).toBeGreaterThanOrEqual(
+			0,
+		);
 		expect(span.status.code).toBe(SpanStatusCode.OK);
 	});
 
@@ -131,18 +133,18 @@ describe("BatchEvaluator telemetry", () => {
 			},
 		};
 
-		const spans = await runBatch(
-			[flaky],
-			[{ candidateText: "Test" }],
-			{ retryConfig: { maxRetries: 3, retryDelay: 1, exponentialBackoff: false } },
-		);
+		const spans = await runBatch([flaky], [{ candidateText: "Test" }], {
+			retryConfig: { maxRetries: 3, retryDelay: 1, exponentialBackoff: false },
+		});
 
 		const span = getSpan(spans, "eval-kit.batch.process_row");
 		const retryEvents = span.events.filter((e) => e.name === "retry");
 
 		expect(retryEvents).toHaveLength(2);
 		expect(retryEvents[0].attributes?.["eval_kit.retry.attempt"]).toBe(1);
-		expect(retryEvents[0].attributes?.["eval_kit.retry.error"]).toBe("ECONNRESET");
+		expect(retryEvents[0].attributes?.["eval_kit.retry.error"]).toBe(
+			"ECONNRESET",
+		);
 		expect(retryEvents[1].attributes?.["eval_kit.retry.attempt"]).toBe(2);
 		expect(span.attributes["eval_kit.row.retry_count"]).toBe(2);
 		expect(span.status.code).toBe(SpanStatusCode.OK);
@@ -156,11 +158,9 @@ describe("BatchEvaluator telemetry", () => {
 			},
 		};
 
-		const spans = await runBatch(
-			[failing],
-			[{ candidateText: "Test" }],
-			{ retryConfig: { maxRetries: 1, retryDelay: 1 } },
-		);
+		const spans = await runBatch([failing], [{ candidateText: "Test" }], {
+			retryConfig: { maxRetries: 1, retryDelay: 1 },
+		});
 
 		const span = getSpan(spans, "eval-kit.batch.process_row");
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
@@ -171,10 +171,16 @@ describe("BatchEvaluator telemetry", () => {
 	it("should skip parse_input span for in-memory data", async () => {
 		const spans = await runBatch(
 			[createMockEvaluator("test")],
-			[{ candidateText: "Row 1" }, { candidateText: "Row 2" }, { candidateText: "Row 3" }],
+			[
+				{ candidateText: "Row 1" },
+				{ candidateText: "Row 2" },
+				{ candidateText: "Row 3" },
+			],
 		);
 
-		const parseSpan = spans.find((s) => s.name === "eval-kit.batch.parse_input");
+		const parseSpan = spans.find(
+			(s) => s.name === "eval-kit.batch.parse_input",
+		);
 		expect(parseSpan).toBeUndefined();
 	});
 });

@@ -28,7 +28,6 @@ export class ProgressTracker {
 	 * Start tracking progress
 	 */
 	start(): void {
-		this.startTime = Date.now();
 		this.emit("started");
 	}
 
