@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8"));
 
 // Externalize function - exclude all dependencies from the bundle
 const external = (id: string) => {
@@ -16,6 +19,9 @@ const external = (id: string) => {
 };
 
 export default defineConfig({
+	define: {
+		__EVAL_KIT_VERSION__: JSON.stringify(pkg.version),
+	},
 	plugins: [
 		dts({
 			include: ["src"],

@@ -1,5 +1,11 @@
 import { generateObject } from "ai";
 import { z } from "zod";
+import {
+	type EvalKitSpan,
+	getTracer,
+	isTelemetryEnabled,
+	SpanStatusCode,
+} from "../telemetry.js";
 import type {
 	EvaluationInput,
 	EvaluatorConfig,
@@ -44,66 +50,152 @@ export class Evaluator {
 	}
 
 	async evaluate(input: EvaluationInput): Promise<EvaluatorResult> {
+		const tracer = await getTracer();
+		const modelId = (this.model as { modelId?: string }).modelId;
+
+		return tracer.startActiveSpan(
+			"eval-kit.evaluator.evaluate",
+			{
+				attributes: {
+					"eval_kit.evaluator.name": this.name,
+					"eval_kit.model.id": modelId ?? "unknown",
+					"eval_kit.score_config.type": this.scoreConfig.type,
+					"eval_kit.input.candidate_text_length": input.candidateText.length,
+				},
+			},
+			(span: EvalKitSpan) => this.runEvaluation(input, modelId, span),
+		);
+	}
+
+	private async runEvaluation(
+		input: EvaluationInput,
+		modelId: string | undefined,
+		span: EvalKitSpan,
+	): Promise<EvaluatorResult> {
 		const startTime = Date.now();
+		let spanError: string | undefined;
+		let evaluatorResult: EvaluatorResult;
 
 		try {
-			const variables = this.prepareVariables(input);
-			const scoreInstructions = this.formatScoreInstructions();
-			const prompt = `${this.templateRenderer.render(this.evaluationPrompt, variables)}\n\n${scoreInstructions}`;
-
-			const schema = this.createSchema();
-
-			const result = (await generateObject({
-				model: this.model,
-				schema,
-				prompt,
-				temperature: this.modelSettings?.temperature,
-				maxOutputTokens: this.modelSettings?.maxOutputTokens,
-				topP: this.modelSettings?.topP,
-				topK: this.modelSettings?.topK,
-				presencePenalty: this.modelSettings?.presencePenalty,
-				frequencyPenalty: this.modelSettings?.frequencyPenalty,
-				seed: this.modelSettings?.seed,
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			} as any)) as unknown as {
-				object: { score: number | string; feedback: string };
-				usage: unknown;
-			};
-
-			const executionTime = Date.now() - startTime;
-			const tokenUsage = this.extractTokenUsage(result.usage);
-
-			return {
-				evaluatorName: this.name,
-				model: (this.model as { modelId?: string }).modelId,
-				score: result.object.score,
-				feedback: result.object.feedback,
-				processingStats: {
-					executionTime,
-					tokenUsage,
-				},
-			};
+			evaluatorResult = await this.executeEvaluation(input, modelId, span);
 		} catch (error) {
-			const executionTime = Date.now() - startTime;
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			const errorDetails =
-				error instanceof Error && "cause" in error
-					? String(error.cause)
-					: undefined;
+			evaluatorResult = this.buildErrorResult(error, modelId, startTime);
+			spanError = evaluatorResult.error;
+			span.recordException(
+				error instanceof Error ? error : (spanError ?? String(error)),
+			);
+		} finally {
+			span.setAttribute(
+				"eval_kit.result.execution_time_ms",
+				Date.now() - startTime,
+			);
+			if (spanError) {
+				span.setAttribute("eval_kit.result.error", spanError);
+				span.setStatus({ code: SpanStatusCode.ERROR, message: spanError });
+			} else {
+				span.setStatus({ code: SpanStatusCode.OK });
+			}
+			span.end();
+		}
 
-			return {
-				evaluatorName: this.name,
-				model: (this.model as { modelId?: string }).modelId,
-				score: 0,
-				feedback: `Evaluation failed: ${errorMessage}`,
-				processingStats: {
-					executionTime,
-				},
-				error: errorDetails
-					? `${errorMessage} (${errorDetails})`
-					: errorMessage,
-			};
+		return evaluatorResult;
+	}
+
+	private buildErrorResult(
+		error: unknown,
+		modelId: string | undefined,
+		startTime: number,
+	): EvaluatorResult {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorDetails =
+			error instanceof Error && "cause" in error
+				? String(error.cause)
+				: undefined;
+		const fullError = errorDetails
+			? `${errorMessage} (${errorDetails})`
+			: errorMessage;
+
+		return {
+			evaluatorName: this.name,
+			model: modelId,
+			score: 0,
+			feedback: `Evaluation failed: ${errorMessage}`,
+			processingStats: { executionTime: Date.now() - startTime },
+			error: fullError,
+		};
+	}
+
+	private async executeEvaluation(
+		input: EvaluationInput,
+		modelId: string | undefined,
+		span: EvalKitSpan,
+	): Promise<EvaluatorResult> {
+		const startTime = Date.now();
+		const prompt = this.buildPrompt(input);
+		const schema = this.createSchema();
+
+		const result = (await generateObject({
+			model: this.model,
+			schema,
+			prompt,
+			temperature: this.modelSettings?.temperature,
+			maxOutputTokens: this.modelSettings?.maxOutputTokens,
+			topP: this.modelSettings?.topP,
+			topK: this.modelSettings?.topK,
+			presencePenalty: this.modelSettings?.presencePenalty,
+			frequencyPenalty: this.modelSettings?.frequencyPenalty,
+			seed: this.modelSettings?.seed,
+			experimental_telemetry: { isEnabled: isTelemetryEnabled() },
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any)) as unknown as {
+			object: { score: number | string; feedback: string };
+			usage: unknown;
+		};
+
+		const executionTime = Date.now() - startTime;
+		const tokenUsage = this.extractTokenUsage(result.usage);
+
+		this.setTokenAttributes(span, tokenUsage);
+		span.setAttribute("eval_kit.result.score", result.object.score);
+
+		return {
+			evaluatorName: this.name,
+			model: modelId,
+			score: result.object.score,
+			feedback: result.object.feedback,
+			processingStats: { executionTime, tokenUsage },
+		};
+	}
+
+	private buildPrompt(input: EvaluationInput): string {
+		const variables = this.prepareVariables(input);
+		const scoreInstructions = this.formatScoreInstructions();
+		return `${this.templateRenderer.render(this.evaluationPrompt, variables)}\n\n${scoreInstructions}`;
+	}
+
+	private setTokenAttributes(
+		span: EvalKitSpan,
+		tokenUsage:
+			| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+			| undefined,
+	): void {
+		if (tokenUsage?.inputTokens !== undefined) {
+			span.setAttribute(
+				"eval_kit.result.token_usage.input",
+				tokenUsage.inputTokens,
+			);
+		}
+		if (tokenUsage?.outputTokens !== undefined) {
+			span.setAttribute(
+				"eval_kit.result.token_usage.output",
+				tokenUsage.outputTokens,
+			);
+		}
+		if (tokenUsage?.totalTokens !== undefined) {
+			span.setAttribute(
+				"eval_kit.result.token_usage.total",
+				tokenUsage.totalTokens,
+			);
 		}
 	}
 

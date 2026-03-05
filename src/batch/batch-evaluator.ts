@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+	type EvalKitSpan,
+	getCachedTracer,
+	SpanStatusCode,
+	withSpan,
+} from "../telemetry.js";
 import type { EvaluatorResult, IEvaluator } from "../types/evaluator.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { CsvExporter } from "./exporters/csv-exporter.js";
@@ -43,80 +49,125 @@ export class BatchEvaluator {
 	 * Run batch evaluation on input data
 	 */
 	async evaluate(inputConfig: BatchInputConfig): Promise<BatchResult> {
-		// Parse input
-		const allRows = await this.parseInput(inputConfig);
+		return withSpan(
+			"eval-kit.batch.evaluate",
+			{
+				attributes: {
+					"eval_kit.batch.id": this.batchId,
+					"eval_kit.batch.concurrency": this.config.concurrency ?? 5,
+					"eval_kit.batch.execution_mode":
+						this.config.evaluatorExecutionMode ?? "parallel",
+				},
+			},
+			async (span) => {
+				// Parse input
+				const allRows = await this.parseInput(inputConfig);
 
-		// Handle startIndex for resuming from a specific position
-		const startIndex = inputConfig.startIndex ?? 0;
-		const rows = startIndex > 0 ? allRows.slice(startIndex) : allRows;
+				span.setAttribute("eval_kit.batch.total_rows", allRows.length);
 
-		// Mark rows before startIndex as already processed (for accurate progress tracking)
-		for (let i = 0; i < startIndex; i++) {
-			this.processedRowIndices.add(i);
-		}
+				// Handle startIndex for resuming from a specific position
+				const startIndex = inputConfig.startIndex ?? 0;
+				const rows = startIndex > 0 ? allRows.slice(startIndex) : allRows;
 
-		// Initialize progress tracker (use total rows for accurate percentage)
-		this.progressTracker = new ProgressTracker({
-			totalRows: allRows.length,
-			emitInterval: this.config.progressInterval,
-			onProgress: this.config.onProgress,
-		});
-		this.progressTracker.start();
+				// Mark rows before startIndex as already processed (for accurate progress tracking)
+				for (let i = 0; i < startIndex; i++) {
+					this.processedRowIndices.add(i);
+				}
 
-		// Fast-forward progress tracker for skipped rows
-		if (startIndex > 0) {
-			this.progressTracker.skipRows(startIndex);
-		}
+				// Initialize progress tracker (use total rows for accurate percentage)
+				this.progressTracker = new ProgressTracker({
+					totalRows: allRows.length,
+					emitInterval: this.config.progressInterval,
+					onProgress: this.config.onProgress,
+				});
+				this.progressTracker.start();
 
-		// Process rows with controlled concurrency
-		// We batch into chunks to avoid creating all promises at once
-		const maxConcurrency = this.config.concurrency ?? 5;
-		const batchSize = maxConcurrency * 2; // Process in batches of 2x concurrency
+				// Fast-forward progress tracker for skipped rows
+				if (startIndex > 0) {
+					this.progressTracker.skipRows(startIndex);
+				}
 
-		for (let i = 0; i < rows.length; i += batchSize) {
-			const batch = rows.slice(i, i + batchSize);
-			const batchPromises = batch.map((row, batchIndex) =>
-				// Adjust index to account for startIndex offset
-				this.processRow(row, startIndex + i + batchIndex),
-			);
-			await Promise.all(batchPromises);
-		}
+				// Process rows with controlled concurrency
+				// We batch into chunks to avoid creating all promises at once
+				const maxConcurrency = this.config.concurrency ?? 5;
+				const batchSize = maxConcurrency * 2; // Process in batches of 2x concurrency
 
-		// Mark completion
-		this.progressTracker.complete();
+				for (let i = 0; i < rows.length; i += batchSize) {
+					const batch = rows.slice(i, i + batchSize);
+					const batchPromises = batch.map((row, batchIndex) =>
+						// Adjust index to account for startIndex offset
+						this.processRow(row, startIndex + i + batchIndex),
+					);
+					await Promise.all(batchPromises);
+				}
 
-		// Return results
-		return this.buildResult();
+				// Mark completion
+				this.progressTracker.complete();
+
+				// Return results
+				const result = this.buildResult();
+				span.setAttribute(
+					"eval_kit.batch.successful_rows",
+					result.successfulRows,
+				);
+				span.setAttribute("eval_kit.batch.failed_rows", result.failedRows);
+				return result;
+			},
+		);
 	}
 
 	/**
 	 * Export results to a destination
 	 */
 	async export(exportConfig: BatchExportConfig): Promise<void> {
-		const exporter = this.getExporter(exportConfig.format);
-		await exporter.export(this.results, exportConfig);
+		return withSpan(
+			"eval-kit.batch.export",
+			{
+				attributes: {
+					"eval_kit.export.format": exportConfig.format,
+					"eval_kit.export.row_count": this.results.length,
+				},
+			},
+			async () => {
+				const exporter = this.getExporter(exportConfig.format);
+				await exporter.export(this.results, exportConfig);
+			},
+		);
 	}
 
 	/**
 	 * Parse input - supports both file-based and in-memory data
 	 */
 	private async parseInput(config: BatchInputConfig): Promise<BatchInputRow[]> {
-		// Check if it's in-memory data config
+		// In-memory data — no I/O, skip span
 		if ("data" in config) {
 			return config.data;
 		}
 
-		// File-based config
-		const fileConfig = config as BatchInputFileConfig;
-		let format = fileConfig.format;
+		// File-based config — actual I/O worth tracing
+		return withSpan(
+			"eval-kit.batch.parse_input",
+			{
+				attributes: {
+					"eval_kit.parse.input_format": "file",
+				},
+			},
+			async (span) => {
+				const fileConfig = config as BatchInputFileConfig;
+				let format = fileConfig.format;
 
-		// Handle "auto" format detection
-		if (!format || format === "auto") {
-			format = this.detectFormat(fileConfig.filePath);
-		}
+				// Handle "auto" format detection
+				if (!format || format === "auto") {
+					format = this.detectFormat(fileConfig.filePath);
+				}
 
-		const parser = this.getParser(format);
-		return parser.parse(fileConfig);
+				const parser = this.getParser(format);
+				const rows = await parser.parse(fileConfig);
+
+				span.setAttribute("eval_kit.parse.row_count", rows.length);
+				return rows;
+			},
+		);
 	}
 
 	/**
@@ -169,158 +220,245 @@ export class BatchEvaluator {
 
 		await this.concurrencyManager.run(async () => {
 			const rowId = row.id ?? `row-${index}`;
-			const startTime = Date.now();
-			let retryCount = 0;
-			const maxRetries = this.config.retryConfig?.maxRetries ?? 3;
+			const tracer = getCachedTracer();
 
-			// Merge default input fields with row data
-			// Row data takes precedence over defaults
-			const inputData: BatchInputRow = {
-				...this.config.defaultInput,
-				...row,
-			};
-
-			// Loop allows: 1 initial attempt + maxRetries retry attempts
-			// With maxRetries=3: attempts at retryCount 0,1,2,3 = 4 total attempts
-			while (true) {
-				try {
-					// Run evaluators
-					const evaluatorResults = await this.runEvaluators(inputData);
-
-					// Calculate duration
-					const durationMs = Date.now() - startTime;
-
-					// Calculate total tokens used
-					const tokensUsed = evaluatorResults.reduce(
-						(sum, r) => sum + (r.processingStats.tokenUsage?.totalTokens ?? 0),
-						0,
-					);
-
-					// Create result (use merged inputData so defaults are included)
-					const result: BatchEvaluationResult = {
-						rowId,
-						rowIndex: index,
-						input: inputData,
-						results: evaluatorResults,
-						timestamp: new Date().toISOString(),
-						durationMs,
-						retryCount,
-					};
-
-					// Call onResult callback for streaming results
-					if (this.config.onResult) {
-						const callbackResult = this.config.onResult(result);
-						if (callbackResult instanceof Promise) {
-							await callbackResult;
-						}
-					}
-
-					// Store result in memory
-					this.results.push(result);
-					this.processedRowIndices.add(index);
-
-					// Update progress
-					this.progressTracker?.recordSuccess(durationMs, tokensUsed);
-
-					return; // Success, exit retry loop
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-
-					// Check if we should retry
-					const shouldRetry = this.shouldRetry(
-						errorMessage,
-						retryCount,
-						maxRetries,
-					);
-
-					if (shouldRetry) {
-						retryCount++;
-						this.progressTracker?.recordRetry(errorMessage, retryCount);
-
-						// Calculate delay with exponential backoff
-						const baseDelay = this.config.retryConfig?.retryDelay ?? 1000;
-						const delay = this.config.retryConfig?.exponentialBackoff
-							? baseDelay * 2 ** (retryCount - 1)
-							: baseDelay;
-
-						await this.sleep(delay);
-					} else {
-						// Max retries reached or non-retryable error
-						const durationMs = Date.now() - startTime;
-
-						const result: BatchEvaluationResult = {
-							rowId,
-							rowIndex: index,
-							input: row,
-							results: [],
-							timestamp: new Date().toISOString(),
-							durationMs,
-							retryCount,
-							error: errorMessage,
-						};
-
-						this.results.push(result);
-						this.processedRowIndices.add(index);
-						this.progressTracker?.recordFailure(durationMs);
-
-						// Stop on error if configured
-						if (this.config.stopOnError) {
-							throw new Error(
-								`Stopping batch evaluation due to error: ${errorMessage}`,
-							);
-						}
-
-						return; // Exit retry loop
-					}
-				}
-			}
+			await tracer.startActiveSpan(
+				"eval-kit.batch.process_row",
+				{
+					attributes: { "eval_kit.row.id": rowId, "eval_kit.row.index": index },
+				},
+				(span: EvalKitSpan) => this.runRowWithSpan(row, index, span),
+			);
 		});
+	}
+
+	private async runRowWithSpan(
+		row: BatchInputRow,
+		index: number,
+		span: EvalKitSpan,
+	): Promise<void> {
+		const startTime = Date.now();
+		let spanError: string | undefined;
+		const inputData = { ...this.config.defaultInput, ...row };
+		const rowId = row.id ?? `row-${index}`;
+
+		try {
+			await this.executeRowWithRetry({
+				inputData,
+				row,
+				index,
+				rowId,
+				span,
+				startTime,
+			});
+		} catch (error) {
+			spanError = error instanceof Error ? error.message : String(error);
+			span.recordException(error instanceof Error ? error : spanError);
+		} finally {
+			span.setAttribute("eval_kit.row.duration_ms", Date.now() - startTime);
+			if (spanError) {
+				span.setAttribute("eval_kit.result.error", spanError);
+				span.setStatus({ code: SpanStatusCode.ERROR, message: spanError });
+			} else {
+				span.setStatus({ code: SpanStatusCode.OK });
+			}
+			span.end();
+		}
+	}
+
+	private async executeRowWithRetry(ctx: {
+		inputData: BatchInputRow;
+		row: BatchInputRow;
+		index: number;
+		rowId: string;
+		span: EvalKitSpan;
+		startTime: number;
+	}): Promise<void> {
+		let retryCount = 0;
+		const maxRetries = this.config.retryConfig?.maxRetries ?? 3;
+		let lastError: unknown;
+
+		while (true) {
+			try {
+				await this.executeRowEvaluation({ ...ctx, retryCount });
+				ctx.span.setAttribute("eval_kit.row.retry_count", retryCount);
+				return;
+			} catch (error) {
+				lastError = error;
+				const errorCtx = {
+					error,
+					span: ctx.span,
+					startTime: ctx.startTime,
+					retryCount,
+					maxRetries,
+					rowId: ctx.rowId,
+					index: ctx.index,
+					row: ctx.row,
+				};
+				const shouldRetry = await this.handleRowError(errorCtx);
+				if (!shouldRetry) {
+					ctx.span.setAttribute("eval_kit.row.retry_count", retryCount);
+					throw lastError;
+				}
+				retryCount++;
+			}
+		}
+	}
+
+	private async handleRowError(ctx: {
+		error: unknown;
+		span: EvalKitSpan;
+		startTime: number;
+		retryCount: number;
+		maxRetries: number;
+		rowId: string;
+		index: number;
+		row: BatchInputRow;
+	}): Promise<boolean> {
+		const errorMessage =
+			ctx.error instanceof Error ? ctx.error.message : String(ctx.error);
+		const shouldRetry = this.shouldRetry(
+			errorMessage,
+			ctx.retryCount,
+			ctx.maxRetries,
+		);
+
+		if (shouldRetry) {
+			const nextAttempt = ctx.retryCount + 1;
+			this.progressTracker?.recordRetry(errorMessage, nextAttempt);
+			const delay = this.calculateRetryDelay(nextAttempt);
+
+			ctx.span.addEvent("retry", {
+				"eval_kit.retry.attempt": nextAttempt,
+				"eval_kit.retry.delay_ms": delay,
+				"eval_kit.retry.error": errorMessage,
+			});
+
+			await this.sleep(delay);
+			return true;
+		}
+
+		const durationMs = Date.now() - ctx.startTime;
+		this.results.push({
+			rowId: ctx.rowId,
+			rowIndex: ctx.index,
+			input: ctx.row,
+			results: [],
+			timestamp: new Date().toISOString(),
+			durationMs,
+			retryCount: ctx.retryCount,
+			error: errorMessage,
+		});
+
+		this.processedRowIndices.add(ctx.index);
+		this.progressTracker?.recordFailure(durationMs);
+
+		if (this.config.stopOnError) {
+			throw new Error(
+				`Stopping batch evaluation due to error: ${errorMessage}`,
+			);
+		}
+
+		return false;
+	}
+
+	private calculateRetryDelay(attempt: number): number {
+		const baseDelay = this.config.retryConfig?.retryDelay ?? 1000;
+		return this.config.retryConfig?.exponentialBackoff
+			? baseDelay * 2 ** (attempt - 1)
+			: baseDelay;
+	}
+
+	private async executeRowEvaluation(ctx: {
+		inputData: BatchInputRow;
+		index: number;
+		rowId: string;
+		startTime: number;
+		retryCount: number;
+	}): Promise<void> {
+		const evaluatorResults = await this.runEvaluators(ctx.inputData);
+		const durationMs = Date.now() - ctx.startTime;
+		const tokensUsed = evaluatorResults.reduce(
+			(sum, r) => sum + (r.processingStats.tokenUsage?.totalTokens ?? 0),
+			0,
+		);
+
+		const result: BatchEvaluationResult = {
+			rowId: ctx.rowId,
+			rowIndex: ctx.index,
+			input: ctx.inputData,
+			results: evaluatorResults,
+			timestamp: new Date().toISOString(),
+			durationMs,
+			retryCount: ctx.retryCount,
+		};
+
+		if (this.config.onResult) {
+			const callbackResult = this.config.onResult(result);
+			if (callbackResult instanceof Promise) {
+				await callbackResult;
+			}
+		}
+
+		this.results.push(result);
+		this.processedRowIndices.add(ctx.index);
+		this.progressTracker?.recordSuccess(durationMs, tokensUsed);
 	}
 
 	/**
 	 * Run all evaluators on a single row
 	 */
 	private async runEvaluators(row: BatchInputRow): Promise<EvaluatorResult[]> {
-		const input = {
-			candidateText: row.candidateText,
-			prompt: row.prompt,
-			referenceText: row.referenceText,
-			sourceText: row.sourceText,
-			contentType: row.contentType,
-			language: row.language,
-		};
+		return withSpan(
+			"eval-kit.batch.run_evaluators",
+			{
+				attributes: {
+					"eval_kit.evaluator_count": this.evaluators.length,
+					"eval_kit.execution_mode":
+						this.config.evaluatorExecutionMode ?? "parallel",
+				},
+			},
+			async () => {
+				const input = {
+					candidateText: row.candidateText,
+					prompt: row.prompt,
+					referenceText: row.referenceText,
+					sourceText: row.sourceText,
+					contentType: row.contentType,
+					language: row.language,
+				};
 
-		// Apply timeout if configured
-		const timeout = this.config.timeout;
-		const evaluateWithTimeout = async (evaluator: IEvaluator) => {
-			if (timeout) {
-				return Promise.race([
-					evaluator.evaluate(input),
-					this.timeoutPromise(
-						timeout,
-						`Evaluator ${evaluator.name} timed out after ${timeout}ms`,
-					),
-				]);
-			}
-			return evaluator.evaluate(input);
-		};
+				// Apply timeout if configured
+				const timeout = this.config.timeout;
+				const evaluateWithTimeout = async (evaluator: IEvaluator) => {
+					if (timeout) {
+						return Promise.race([
+							evaluator.evaluate(input),
+							this.timeoutPromise(
+								timeout,
+								`Evaluator ${evaluator.name} timed out after ${timeout}ms`,
+							),
+						]);
+					}
+					return evaluator.evaluate(input);
+				};
 
-		// Run evaluators in parallel or sequential mode
-		if (this.config.evaluatorExecutionMode === "sequential") {
-			const results: EvaluatorResult[] = [];
-			for (const evaluator of this.evaluators) {
-				const result = await evaluateWithTimeout(evaluator);
-				results.push(result as EvaluatorResult);
-			}
-			return results;
-		} else {
-			// Parallel mode (default)
-			const results = await Promise.all(
-				this.evaluators.map((evaluator) => evaluateWithTimeout(evaluator)),
-			);
-			return results as EvaluatorResult[];
-		}
+				// Run evaluators in parallel or sequential mode
+				if (this.config.evaluatorExecutionMode === "sequential") {
+					const results: EvaluatorResult[] = [];
+					for (const evaluator of this.evaluators) {
+						const result = await evaluateWithTimeout(evaluator);
+						results.push(result as EvaluatorResult);
+					}
+					return results;
+				}
+				// Parallel mode (default)
+				const results = await Promise.all(
+					this.evaluators.map((evaluator) => evaluateWithTimeout(evaluator)),
+				);
+				return results as EvaluatorResult[];
+			},
+		);
 	}
 
 	/**

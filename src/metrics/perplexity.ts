@@ -5,6 +5,7 @@ import {
 	type PreTrainedTokenizer,
 	Tensor,
 } from "@xenova/transformers";
+import { withSpan } from "../telemetry.js";
 
 export interface PerplexityOptions {
 	model?: string;
@@ -68,7 +69,7 @@ const normalizePerplexityToScore = (perplexity: number): number => {
 	return Math.max(0, 10 - (perplexity - 300) / 100);
 };
 
-const generateFeedback = (perplexity: number, score: number): string => {
+const generateFeedback = (perplexity: number, _score: number): string => {
 	if (perplexity < 20) {
 		return `Excellent text quality with very natural, human-like language (perplexity: ${perplexity.toFixed(1)})`;
 	}
@@ -90,83 +91,109 @@ export const calculatePerplexity = async (
 ): Promise<PerplexityResult> => {
 	const { model: modelName = "Xenova/gpt2", stride = 512 } = options;
 
-	const { tokenizer, model } = await getModelAndTokenizer(modelName);
+	return withSpan(
+		"eval-kit.metric.perplexity",
+		{
+			attributes: {
+				"eval_kit.metric.name": "perplexity",
+				"eval_kit.metric.model": modelName,
+			},
+		},
+		async (span) => {
+			const wasCached = cachedModel !== null && cachedModelName === modelName;
+			const { tokenizer, model } = await getModelAndTokenizer(modelName);
+			if (!wasCached) {
+				span.addEvent("model_loaded", {
+					"eval_kit.metric.model": modelName,
+				});
+			}
 
-	const encoded = await tokenizer(text, {
-		return_tensors: "pt",
-		truncation: false,
-		add_special_tokens: true,
-	});
+			const encoded = await tokenizer(text, {
+				return_tensors: "pt",
+				truncation: false,
+				add_special_tokens: true,
+			});
 
-	const inputIds = Array.from(encoded.input_ids.data as BigInt64Array).map(
-		(x) => Number(x),
+			const inputIds = Array.from(encoded.input_ids.data as BigInt64Array).map(
+				(x) => Number(x),
+			);
+
+			if (inputIds.length <= 1) {
+				span.setAttribute("eval_kit.metric.token_count", inputIds.length);
+				span.setAttribute("eval_kit.result.score", 100);
+				return {
+					perplexity: 1.0,
+					score: 100,
+					tokenCount: inputIds.length,
+					averageLogProb: 0,
+					modelUsed: modelName,
+					feedback: "Text too short to calculate perplexity meaningfully",
+				};
+			}
+
+			let totalLogProb = 0;
+			let totalTokens = 0;
+
+			for (let i = 0; i < inputIds.length; i += stride) {
+				const end = Math.min(i + stride + 1, inputIds.length);
+				const batch = inputIds.slice(i, end);
+
+				if (batch.length <= 1) continue;
+
+				const batchTensor = {
+					input_ids: new Tensor(
+						"int64",
+						new BigInt64Array(batch.map((x) => BigInt(x))),
+						[1, batch.length],
+					),
+				};
+
+				const outputs = await model(batchTensor);
+				const logits = outputs.logits;
+
+				if (!logits || !logits.data) continue;
+
+				// Get vocab size from logits shape: [batch_size, seq_len, vocab_size]
+				const vocabSize = logits.dims?.[2] || 50257;
+				const logitsArray = Array.from(logits.data as Float32Array);
+
+				for (let j = 1; j < batch.length; j++) {
+					const startIdx = (j - 1) * vocabSize;
+					const endIdx = startIdx + vocabSize;
+					const prevLogits = logitsArray.slice(startIdx, endIdx);
+
+					const probs = softmax(prevLogits);
+					const targetTokenId = batch[j];
+					const prob = probs[targetTokenId] || 1e-10;
+
+					totalLogProb += Math.log(prob);
+					totalTokens++;
+				}
+
+				if (end >= inputIds.length) break;
+			}
+
+			const averageLogProb = totalTokens > 0 ? totalLogProb / totalTokens : 0;
+			const perplexity = Math.exp(-averageLogProb);
+			const score = normalizePerplexityToScore(perplexity);
+
+			span.setAttribute("eval_kit.metric.token_count", totalTokens);
+			span.setAttribute(
+				"eval_kit.result.perplexity",
+				Math.round(perplexity * 100) / 100,
+			);
+			span.setAttribute("eval_kit.result.score", Math.round(score * 100) / 100);
+
+			return {
+				perplexity: Math.round(perplexity * 100) / 100,
+				score: Math.round(score * 100) / 100,
+				tokenCount: totalTokens,
+				averageLogProb: Math.round(averageLogProb * 10000) / 10000,
+				modelUsed: modelName,
+				feedback: generateFeedback(perplexity, score),
+			};
+		},
 	);
-
-	if (inputIds.length <= 1) {
-		return {
-			perplexity: 1.0,
-			score: 100,
-			tokenCount: inputIds.length,
-			averageLogProb: 0,
-			modelUsed: modelName,
-			feedback: "Text too short to calculate perplexity meaningfully",
-		};
-	}
-
-	let totalLogProb = 0;
-	let totalTokens = 0;
-
-	for (let i = 0; i < inputIds.length; i += stride) {
-		const end = Math.min(i + stride + 1, inputIds.length);
-		const batch = inputIds.slice(i, end);
-
-		if (batch.length <= 1) continue;
-
-		const batchTensor = {
-			input_ids: new Tensor(
-				"int64",
-				new BigInt64Array(batch.map((x) => BigInt(x))),
-				[1, batch.length],
-			),
-		};
-
-		const outputs = await model(batchTensor);
-		const logits = outputs.logits;
-
-		if (!logits || !logits.data) continue;
-
-		// Get vocab size from logits shape: [batch_size, seq_len, vocab_size]
-		const vocabSize = logits.dims?.[2] || 50257;
-		const logitsArray = Array.from(logits.data as Float32Array);
-
-		for (let j = 1; j < batch.length; j++) {
-			const startIdx = (j - 1) * vocabSize;
-			const endIdx = startIdx + vocabSize;
-			const prevLogits = logitsArray.slice(startIdx, endIdx);
-
-			const probs = softmax(prevLogits);
-			const targetTokenId = batch[j];
-			const prob = probs[targetTokenId] || 1e-10;
-
-			totalLogProb += Math.log(prob);
-			totalTokens++;
-		}
-
-		if (end >= inputIds.length) break;
-	}
-
-	const averageLogProb = totalTokens > 0 ? totalLogProb / totalTokens : 0;
-	const perplexity = Math.exp(-averageLogProb);
-	const score = normalizePerplexityToScore(perplexity);
-
-	return {
-		perplexity: Math.round(perplexity * 100) / 100,
-		score: Math.round(score * 100) / 100,
-		tokenCount: totalTokens,
-		averageLogProb: Math.round(averageLogProb * 10000) / 10000,
-		modelUsed: modelName,
-		feedback: generateFeedback(perplexity, score),
-	};
 };
 
 export const clearPerplexityCache = (): void => {

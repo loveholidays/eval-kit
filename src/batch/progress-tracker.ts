@@ -14,7 +14,6 @@ export class ProgressTracker {
 	private processedRows = 0;
 	private successfulRows = 0;
 	private failedRows = 0;
-	private startTime: number = 0;
 	private processingTimes: number[] = [];
 	private lastEmitTime = 0;
 	private totalTokens = 0;
@@ -29,7 +28,6 @@ export class ProgressTracker {
 	 * Start tracking progress
 	 */
 	start(): void {
-		this.startTime = Date.now();
 		this.emit("started");
 	}
 

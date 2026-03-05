@@ -94,12 +94,12 @@ export class TemplateRenderer {
 
 		const conditionals = template.matchAll(/\{\{#if\s+(\w+)\}\}/g);
 		for (const match of conditionals) {
-			variables.add(match[1]!);
+			variables.add(match[1]);
 		}
 
 		const substitutions = template.matchAll(/\{\{(\w+)\}\}/g);
 		for (const match of substitutions) {
-			variables.add(match[1]!);
+			variables.add(match[1]);
 		}
 
 		return Array.from(variables);
@@ -113,11 +113,11 @@ export class TemplateRenderer {
 			/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
 		);
 		for (const match of conditionals) {
-			optional.add(match[1]!);
+			optional.add(match[1]);
 
-			const innerVars = match[2]!.matchAll(/\{\{(\w+)\}\}/g);
+			const innerVars = match[2]?.matchAll(/\{\{(\w+)\}\}/g);
 			for (const innerMatch of innerVars) {
-				optional.add(innerMatch[1]!);
+				optional.add(innerMatch[1]);
 			}
 		}
 
@@ -125,7 +125,7 @@ export class TemplateRenderer {
 		for (const part of parts) {
 			const substitutions = part.matchAll(/\{\{(\w+)\}\}/g);
 			for (const match of substitutions) {
-				const varName = match[1]!;
+				const varName = match[1];
 				if (!optional.has(varName)) {
 					required.add(varName);
 				}
