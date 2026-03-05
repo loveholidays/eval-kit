@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: "20"
           cache: "pnpm"
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -65,5 +66,5 @@ jobs:
       - name: Publish packages
         if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
         run: |
-          pnpm changeset publish
+          npm publish --provenance --access public
           git push --follow-tags
