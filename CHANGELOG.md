@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.3
+
+### Patch Changes
+
+- 8b890fe: Retry publish after fixing OIDC auth token conflict in CI workflow
+
 ## 1.1.2
 
 ### Patch Changes
