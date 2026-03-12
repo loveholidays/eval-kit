@@ -66,5 +66,6 @@ jobs:
       - name: Publish packages
         if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
         run: |
+          npm config set @loveholidays:registry https://registry.npmjs.org
           npm publish --provenance --access public
           git push --follow-tags
