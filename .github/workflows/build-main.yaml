@@ -24,9 +24,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -66,6 +65,5 @@ jobs:
       - name: Publish packages
         if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
         run: |
-          npm config delete //registry.npmjs.org/:_authToken
           npm publish --provenance --access public
           git push --follow-tags
