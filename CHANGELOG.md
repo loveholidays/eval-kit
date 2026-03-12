@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.2
+
+### Patch Changes
+
+- 67caf2a: Retry publish with corrected npm scope registry configuration
+
 ## 1.1.1
 
 ### Patch Changes
