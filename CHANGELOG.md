@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.4
+
+### Patch Changes
+
+- f06e185: Retry publish with Node 22 for native npm OIDC trusted publishing support
+
 ## 1.1.3
 
 ### Patch Changes
