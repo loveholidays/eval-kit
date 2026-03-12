@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.1
+
+### Patch Changes
+
+- e09274a: Fix onResult callback not being called for failed rows in BatchEvaluator. Previously, errors were silently dropped and consumers relying on onResult for logging or persistence never received failure notifications.
+
 ## 1.1.0
 
 ### Minor Changes
