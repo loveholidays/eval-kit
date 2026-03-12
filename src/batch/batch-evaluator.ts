@@ -339,7 +339,7 @@ export class BatchEvaluator {
 		}
 
 		const durationMs = Date.now() - ctx.startTime;
-		this.results.push({
+		const result: BatchEvaluationResult = {
 			rowId: ctx.rowId,
 			rowIndex: ctx.index,
 			input: ctx.row,
@@ -348,8 +348,9 @@ export class BatchEvaluator {
 			durationMs,
 			retryCount: ctx.retryCount,
 			error: errorMessage,
-		});
+		};
 
+		await this.emitResult(result);
 		this.processedRowIndices.add(ctx.index);
 		this.progressTracker?.recordFailure(durationMs);
 
@@ -367,6 +368,14 @@ export class BatchEvaluator {
 		return this.config.retryConfig?.exponentialBackoff
 			? baseDelay * 2 ** (attempt - 1)
 			: baseDelay;
+	}
+
+	private async emitResult(result: BatchEvaluationResult): Promise<void> {
+		const callbackResult = this.config.onResult?.(result);
+		if (callbackResult instanceof Promise) {
+			await callbackResult;
+		}
+		this.results.push(result);
 	}
 
 	private async executeRowEvaluation(ctx: {
@@ -393,14 +402,7 @@ export class BatchEvaluator {
 			retryCount: ctx.retryCount,
 		};
 
-		if (this.config.onResult) {
-			const callbackResult = this.config.onResult(result);
-			if (callbackResult instanceof Promise) {
-				await callbackResult;
-			}
-		}
-
-		this.results.push(result);
+		await this.emitResult(result);
 		this.processedRowIndices.add(ctx.index);
 		this.progressTracker?.recordSuccess(durationMs, tokensUsed);
 	}
