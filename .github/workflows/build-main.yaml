@@ -65,5 +65,5 @@ jobs:
       - name: Publish packages
         if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
         run: |
-          npm publish --provenance --access public
+          pnpm publish --provenance --access public --no-git-checks
           git push --follow-tags
