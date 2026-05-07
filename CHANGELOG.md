@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.1.5
+
+### Patch Changes
+
+- 05350dc: Migrate evaluator structured output generation to AI SDK v6.
+
 ## 1.1.4
 
 ### Patch Changes
