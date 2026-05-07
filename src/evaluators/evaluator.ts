@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import {
 	type EvalKitSpan,
@@ -134,9 +134,9 @@ export class Evaluator {
 		const prompt = this.buildPrompt(input);
 		const schema = this.createSchema();
 
-		const result = (await generateObject({
+		const result = await generateText({
 			model: this.model,
-			schema,
+			output: Output.object({ schema }),
 			prompt,
 			temperature: this.modelSettings?.temperature,
 			maxOutputTokens: this.modelSettings?.maxOutputTokens,
@@ -146,23 +146,19 @@ export class Evaluator {
 			frequencyPenalty: this.modelSettings?.frequencyPenalty,
 			seed: this.modelSettings?.seed,
 			experimental_telemetry: { isEnabled: isTelemetryEnabled() },
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		} as any)) as unknown as {
-			object: { score: number | string; feedback: string };
-			usage: unknown;
-		};
+		});
 
 		const executionTime = Date.now() - startTime;
 		const tokenUsage = this.extractTokenUsage(result.usage);
 
 		this.setTokenAttributes(span, tokenUsage);
-		span.setAttribute("eval_kit.result.score", result.object.score);
+		span.setAttribute("eval_kit.result.score", result.output.score);
 
 		return {
 			evaluatorName: this.name,
 			model: modelId,
-			score: result.object.score,
-			feedback: result.object.feedback,
+			score: result.output.score,
+			feedback: result.output.feedback,
 			processingStats: { executionTime, tokenUsage },
 		};
 	}

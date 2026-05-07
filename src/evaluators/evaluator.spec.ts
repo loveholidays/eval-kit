@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { LanguageModel } from "ai";
 
 // Mock the ai module before importing Evaluator
-const mockGenerateObject = jest.fn();
+const mockGenerateText = jest.fn();
 jest.unstable_mockModule("ai", () => ({
-	generateObject: mockGenerateObject,
+	generateText: mockGenerateText,
+	Output: {
+		object: jest.fn((output) => ({ type: "object", ...output })),
+	},
 }));
 
 // Import after mocking
@@ -22,7 +25,7 @@ const createMockModel = (): LanguageModel => {
 
 describe("Evaluator", () => {
 	beforeEach(() => {
-		mockGenerateObject.mockClear();
+		mockGenerateText.mockClear();
 	});
 
 	describe("constructor", () => {
@@ -56,10 +59,10 @@ describe("Evaluator", () => {
 		it("should evaluate with basic input", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: 90, feedback: "Excellent fluency" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: 90, feedback: "Excellent fluency" },
 				usage: { inputTokens: 15, outputTokens: 10, totalTokens: 25 },
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "fluency",
@@ -85,10 +88,10 @@ describe("Evaluator", () => {
 		it("should evaluate with reference text", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: 88, feedback: "Good accuracy" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: 88, feedback: "Good accuracy" },
 				usage: undefined,
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "accuracy",
@@ -109,7 +112,7 @@ Candidate: {{candidateText}}
 		it("should handle API failures gracefully", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockRejectedValue(new Error("LLM API failed"));
+			mockGenerateText.mockRejectedValue(new Error("LLM API failed"));
 
 			const evaluator = new Evaluator({
 				name: "test",
@@ -129,10 +132,10 @@ Candidate: {{candidateText}}
 		it("should handle categorical scores", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: "excellent", feedback: "Top quality" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: "excellent", feedback: "Top quality" },
 				usage: undefined,
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "quality",
@@ -154,10 +157,10 @@ Candidate: {{candidateText}}
 		it("should handle numeric score config", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: 8, feedback: "Good" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: 8, feedback: "Good" },
 				usage: undefined,
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "rating",
@@ -181,10 +184,10 @@ Candidate: {{candidateText}}
 		it("should track execution time", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: 85, feedback: "Good" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: 85, feedback: "Good" },
 				usage: undefined,
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "test",
@@ -200,13 +203,13 @@ Candidate: {{candidateText}}
 			expect(typeof result.processingStats.executionTime).toBe("number");
 		});
 
-		it("should pass model settings to generateObject", async () => {
+		it("should pass model settings to generateText", async () => {
 			const model = createMockModel();
 
-			mockGenerateObject.mockResolvedValue({
-				object: { score: 85, feedback: "Good" },
+			mockGenerateText.mockResolvedValue({
+				output: { score: 85, feedback: "Good" },
 				usage: undefined,
-			} as any);
+			});
 
 			const evaluator = new Evaluator({
 				name: "test",
@@ -223,7 +226,7 @@ Candidate: {{candidateText}}
 				candidateText: "Test",
 			});
 
-			expect(mockGenerateObject).toHaveBeenCalledWith(
+			expect(mockGenerateText).toHaveBeenCalledWith(
 				expect.objectContaining({
 					temperature: 0.7,
 					maxOutputTokens: 500,
