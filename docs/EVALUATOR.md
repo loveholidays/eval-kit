@@ -10,13 +10,13 @@ The Evaluator enables LLM-powered content evaluation with flexible prompt templa
 
 1. **Evaluator** - Main evaluator class that orchestrates evaluation
 2. **TemplateRenderer** - Handlebars-style template engine for prompts
-3. **Vercel AI SDK** - Handles LLM API calls with structured output via generateObject
+3. **Vercel AI SDK** - Handles LLM API calls with structured output via generateText
 4. **Zod Schemas** - Dynamic schema generation based on score configuration
 
 ### Data Flow
 
 ```
-User Input → Template Rendering → Vercel AI SDK generateObject → Structured Result with Stats
+User Input → Template Rendering → Vercel AI SDK generateText → Structured Result with Stats
 ```
 
 ## Template Engine
@@ -64,7 +64,7 @@ This enables automatic detection of required inputs based on the template.
 
 ## Structured Output with Vercel AI SDK
 
-The evaluator uses Vercel AI SDK's `generateObject` function to ensure structured, validated responses from the LLM.
+The evaluator uses Vercel AI SDK's `generateText` function with an output schema to ensure structured, validated responses from the LLM.
 
 ### How It Works
 
@@ -192,7 +192,7 @@ Any provider compatible with Vercel AI SDK, including:
 
 ### Model Settings
 
-Optional settings passed to `generateObject`:
+Optional settings passed to `generateText`:
 
 ```typescript
 {
@@ -394,7 +394,7 @@ The evaluator dynamically creates Zod schemas based on scoreConfig:
 - All score configurations (numeric, categorical, default)
 - Error conditions (API failures, undefined usage)
 - Processing stats tracking (execution time, token usage)
-- Model settings passthrough to generateObject
+- Model settings passthrough to generateText
 
 ## Performance Considerations
 
@@ -408,6 +408,6 @@ Templates are rendered on every evaluation. For high-frequency evaluations, cons
 - Caching rendered templates if variables don't change
 - Using simpler templates without conditionals
 
-### Vercel AI SDK generateObject
+### Vercel AI SDK generateText
 
 The Vercel AI SDK handles response parsing efficiently with structured output. The Zod schema validation ensures type-safe responses without manual parsing overhead.

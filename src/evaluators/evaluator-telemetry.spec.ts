@@ -14,9 +14,12 @@ provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
 provider.register();
 
 // Mock the ai module
-const mockGenerateObject = jest.fn();
+const mockGenerateText = jest.fn();
 jest.unstable_mockModule("ai", () => ({
-	generateObject: mockGenerateObject,
+	generateText: mockGenerateText,
+	Output: {
+		object: jest.fn((output) => ({ type: "object", ...output })),
+	},
 }));
 
 const { Evaluator } = await import("./evaluator.js");
@@ -34,12 +37,12 @@ describe("Evaluator telemetry", () => {
 		exporter.reset();
 		_resetTracer();
 		enableTelemetry(true);
-		mockGenerateObject.mockClear();
+		mockGenerateText.mockClear();
 	});
 
 	it("should create a span with correct name and initial attributes on success", async () => {
-		mockGenerateObject.mockResolvedValue({
-			object: { score: 85, feedback: "Good quality" },
+		mockGenerateText.mockResolvedValue({
+			output: { score: 85, feedback: "Good quality" },
 			usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
 		});
 
@@ -79,7 +82,7 @@ describe("Evaluator telemetry", () => {
 	});
 
 	it("should record error attributes when evaluation fails", async () => {
-		mockGenerateObject.mockRejectedValue(new Error("API rate limited"));
+		mockGenerateText.mockRejectedValue(new Error("API rate limited"));
 
 		const evaluator = new Evaluator({
 			name: "accuracy",
@@ -112,8 +115,8 @@ describe("Evaluator telemetry", () => {
 	});
 
 	it("should not break existing behavior when OTel is present", async () => {
-		mockGenerateObject.mockResolvedValue({
-			object: { score: "excellent", feedback: "Top quality" },
+		mockGenerateText.mockResolvedValue({
+			output: { score: "excellent", feedback: "Top quality" },
 			usage: undefined,
 		});
 
