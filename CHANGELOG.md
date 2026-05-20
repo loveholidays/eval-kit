@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.2.0
+
+### Minor Changes
+
+- 92eb466: Expose detailed AI SDK token usage on evaluator results.
+
 ## 1.1.5
 
 ### Patch Changes
