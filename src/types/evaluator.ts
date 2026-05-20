@@ -2,8 +2,19 @@ import type { LanguageModel } from "ai";
 
 export interface TokenUsage {
 	readonly inputTokens?: number;
+	readonly inputTokenDetails?: {
+		readonly noCacheTokens?: number;
+		readonly cacheReadTokens?: number;
+		readonly cacheWriteTokens?: number;
+	};
 	readonly outputTokens?: number;
+	readonly outputTokenDetails?: {
+		readonly textTokens?: number;
+		readonly reasoningTokens?: number;
+	};
 	readonly totalTokens?: number;
+	readonly reasoningTokens?: number;
+	readonly cachedInputTokens?: number;
 }
 
 export interface ProcessingStats {
