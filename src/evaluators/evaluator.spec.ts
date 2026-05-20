@@ -85,6 +85,57 @@ describe("Evaluator", () => {
 			});
 		});
 
+		it("should preserve detailed token usage", async () => {
+			const model = createMockModel();
+
+			mockGenerateText.mockResolvedValue({
+				output: { score: 90, feedback: "Excellent fluency" },
+				usage: {
+					inputTokens: 150,
+					inputTokenDetails: {
+						noCacheTokens: 100,
+						cacheReadTokens: 40,
+						cacheWriteTokens: 10,
+					},
+					outputTokens: 25,
+					outputTokenDetails: {
+						textTokens: 15,
+						reasoningTokens: 10,
+					},
+					totalTokens: 175,
+					reasoningTokens: 10,
+					cachedInputTokens: 40,
+				},
+			});
+
+			const evaluator = new Evaluator({
+				name: "fluency",
+				model,
+				evaluationPrompt: "Rate the fluency of: {{candidateText}}",
+			});
+
+			const result = await evaluator.evaluate({
+				candidateText: "The quick brown fox jumps over the lazy dog.",
+			});
+
+			expect(result.processingStats.tokenUsage).toEqual({
+				inputTokens: 150,
+				inputTokenDetails: {
+					noCacheTokens: 100,
+					cacheReadTokens: 40,
+					cacheWriteTokens: 10,
+				},
+				outputTokens: 25,
+				outputTokenDetails: {
+					textTokens: 15,
+					reasoningTokens: 10,
+				},
+				totalTokens: 175,
+				reasoningTokens: 10,
+				cachedInputTokens: 40,
+			});
+		});
+
 		it("should evaluate with reference text", async () => {
 			const model = createMockModel();
 

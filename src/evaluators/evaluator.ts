@@ -10,8 +10,23 @@ import type {
 	EvaluationInput,
 	EvaluatorConfig,
 	EvaluatorResult,
+	TokenUsage,
 } from "../types/evaluator.js";
 import { TemplateRenderer } from "../utils/template-engine.js";
+
+function getNumber(value: unknown): number | undefined {
+	return typeof value === "number" ? value : undefined;
+}
+
+function getRecord(value: unknown): Record<string, unknown> | undefined {
+	return value && typeof value === "object"
+		? (value as Record<string, unknown>)
+		: undefined;
+}
+
+function hasNumberValue(value: Record<string, unknown>): boolean {
+	return Object.values(value).some((entry) => typeof entry === "number");
+}
 
 export class Evaluator {
 	readonly name: string;
@@ -171,9 +186,7 @@ export class Evaluator {
 
 	private setTokenAttributes(
 		span: EvalKitSpan,
-		tokenUsage:
-			| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
-			| undefined,
+		tokenUsage: TokenUsage | undefined,
 	): void {
 		if (tokenUsage?.inputTokens !== undefined) {
 			span.setAttribute(
@@ -207,22 +220,51 @@ export class Evaluator {
 		};
 	}
 
-	private extractTokenUsage(
-		usage: unknown,
-	):
-		| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
-		| undefined {
+	private extractTokenUsage(usage: unknown): TokenUsage | undefined {
 		if (!usage) return undefined;
+		const usageRecord = getRecord(usage);
+		if (!usageRecord) return undefined;
+
+		const inputTokenDetails = this.extractInputTokenDetails(
+			usageRecord.inputTokenDetails,
+		);
+		const outputTokenDetails = this.extractOutputTokenDetails(
+			usageRecord.outputTokenDetails,
+		);
+
 		return {
-			inputTokens: (usage as Record<string, unknown>).inputTokens as
-				| number
-				| undefined,
-			outputTokens: (usage as Record<string, unknown>).outputTokens as
-				| number
-				| undefined,
-			totalTokens: (usage as Record<string, unknown>).totalTokens as
-				| number
-				| undefined,
+			inputTokens: getNumber(usageRecord.inputTokens),
+			...(inputTokenDetails ? { inputTokenDetails } : {}),
+			outputTokens: getNumber(usageRecord.outputTokens),
+			...(outputTokenDetails ? { outputTokenDetails } : {}),
+			totalTokens: getNumber(usageRecord.totalTokens),
+			reasoningTokens: getNumber(usageRecord.reasoningTokens),
+			cachedInputTokens: getNumber(usageRecord.cachedInputTokens),
+		};
+	}
+
+	private extractInputTokenDetails(
+		details: unknown,
+	): TokenUsage["inputTokenDetails"] | undefined {
+		const detailRecord = getRecord(details);
+		if (!detailRecord || !hasNumberValue(detailRecord)) return undefined;
+
+		return {
+			noCacheTokens: getNumber(detailRecord.noCacheTokens),
+			cacheReadTokens: getNumber(detailRecord.cacheReadTokens),
+			cacheWriteTokens: getNumber(detailRecord.cacheWriteTokens),
+		};
+	}
+
+	private extractOutputTokenDetails(
+		details: unknown,
+	): TokenUsage["outputTokenDetails"] | undefined {
+		const detailRecord = getRecord(details);
+		if (!detailRecord || !hasNumberValue(detailRecord)) return undefined;
+
+		return {
+			textTokens: getNumber(detailRecord.textTokens),
+			reasoningTokens: getNumber(detailRecord.reasoningTokens),
 		};
 	}
 
