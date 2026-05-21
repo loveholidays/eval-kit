@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: "22"
           cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -42,8 +43,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Check changesets
-        id: changesets
+      - name: Check release state
+        id: release
         run: |
           pnpm changeset status --output status.json || true
           if [ -f status.json ] && [ "$(cat status.json | jq '.releases | length')" -gt 0 ]; then
@@ -52,8 +53,16 @@ jobs:
             echo "HAS_CHANGESETS=false" >> $GITHUB_OUTPUT
           fi
 
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version > /dev/null 2>&1; then
+            echo "CURRENT_VERSION_PUBLISHED=true" >> $GITHUB_OUTPUT
+          else
+            echo "CURRENT_VERSION_PUBLISHED=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Version packages
-        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        if: steps.release.outputs.HAS_CHANGESETS == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,7 +72,8 @@ jobs:
           git push
 
       - name: Publish packages
-        if: steps.changesets.outputs.HAS_CHANGESETS == 'true'
+        if: steps.release.outputs.HAS_CHANGESETS == 'true' || steps.release.outputs.CURRENT_VERSION_PUBLISHED == 'false'
         run: |
-          pnpm publish --provenance --access public --no-git-checks
+          npm install -g npm@11
+          npm publish --access public
           git push --follow-tags
