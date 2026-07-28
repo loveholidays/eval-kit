@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.2.2
+
+### Patch Changes
+
+- 7e81568: Replace the deprecated Transformers.js runtime with the maintained v4 package and update the BERT score and perplexity integrations for its API.
+
 ## 1.2.1
 
 ### Patch Changes
