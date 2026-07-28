@@ -13,8 +13,9 @@ import {
 
 // Set up a real OTel SDK so spans are captured
 const exporter = new InMemorySpanExporter();
-const provider = new NodeTracerProvider();
-provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+const provider = new NodeTracerProvider({
+	spanProcessors: [new SimpleSpanProcessor(exporter)],
+});
 provider.register();
 
 describe("telemetry", () => {
@@ -101,8 +102,9 @@ describe("telemetry", () => {
 			const parent = spans.find((s) => s.name === "parent");
 			expect(child).toBeDefined();
 			expect(parent).toBeDefined();
-			// Child's parent span ID should match parent's span ID
-			expect(child?.parentSpanId).toBe(parent?.spanContext().spanId);
+			expect(child?.parentSpanContext?.spanId).toBe(
+				parent?.spanContext().spanId,
+			);
 		});
 	});
 

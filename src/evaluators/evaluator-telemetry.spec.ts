@@ -9,8 +9,9 @@ import { _resetTracer, enableTelemetry, SpanStatusCode } from "../telemetry.js";
 
 // Set up OTel SDK for span capture
 const exporter = new InMemorySpanExporter();
-const provider = new NodeTracerProvider();
-provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+const provider = new NodeTracerProvider({
+	spanProcessors: [new SimpleSpanProcessor(exporter)],
+});
 provider.register();
 
 // Mock the ai module

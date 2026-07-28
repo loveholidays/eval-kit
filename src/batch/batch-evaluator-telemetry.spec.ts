@@ -15,8 +15,9 @@ import { BatchEvaluator } from "./batch-evaluator.js";
 
 // Set up OTel SDK for span capture
 const exporter = new InMemorySpanExporter();
-const provider = new NodeTracerProvider();
-provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+const provider = new NodeTracerProvider({
+	spanProcessors: [new SimpleSpanProcessor(exporter)],
+});
 provider.register();
 
 const createMockEvaluator = (name: string): IEvaluator => ({
@@ -83,8 +84,12 @@ describe("BatchEvaluator telemetry", () => {
 		const rowSpan = getSpan(spans, "eval-kit.batch.process_row");
 		const evalSpan = getSpan(spans, "eval-kit.batch.run_evaluators");
 
-		expect(rowSpan.parentSpanId).toBe(batchSpan.spanContext().spanId);
-		expect(evalSpan.parentSpanId).toBe(rowSpan.spanContext().spanId);
+		expect(rowSpan.parentSpanContext?.spanId).toBe(
+			batchSpan.spanContext().spanId,
+		);
+		expect(evalSpan.parentSpanContext?.spanId).toBe(
+			rowSpan.spanContext().spanId,
+		);
 	});
 
 	it("should set correct attributes on batch span", async () => {
