@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.2.3
+
+### Patch Changes
+
+- 9f579be: Replace pnpm overrides with compatible development dependency upgrades.
+
 ## 1.2.2
 
 ### Patch Changes
