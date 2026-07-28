@@ -61,10 +61,7 @@
     "overrides": {
       "@babel/core": "^7.29.6",
       "@isaacs/brace-expansion": "^5.0.8",
-      "@opentelemetry/core": "^2.8.0",
-      "@opentelemetry/propagator-jaeger": "^2.9.0",
       "ajv": "^8.18.0",
-      "brace-expansion": "^5.0.8",
       "diff": ">=8.0.3",
       "handlebars": "^4.7.9",
       "js-yaml@3.14.2": "^3.15.0",
@@ -76,9 +73,7 @@
       "picomatch@2.3.1": "^2.3.2",
       "picomatch@4.0.3": "^4.0.4",
       "postcss": "^8.5.18",
-      "protobufjs": "^7.5.5",
-      "rollup": "^4.59.0",
-      "sharp": "^0.35.0"
+      "rollup": "^4.59.0"
     }
   },
   "peerDependencies": {
