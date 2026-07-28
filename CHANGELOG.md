@@ -1,5 +1,11 @@
 # @loveholidays/eval-kit
 
+## 1.2.1
+
+### Patch Changes
+
+- eb6f88b: Update compatible direct and transitive dependencies to patched releases for security advisories.
+
 ## 1.2.0
 
 ### Minor Changes
