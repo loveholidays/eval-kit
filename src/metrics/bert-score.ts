@@ -1,5 +1,5 @@
-import type { FeatureExtractionPipeline } from "@xenova/transformers";
-import { cos_sim, pipeline } from "@xenova/transformers";
+import type { FeatureExtractionPipeline } from "@huggingface/transformers";
+import { cos_sim, pipeline } from "@huggingface/transformers";
 import { withSpan } from "../telemetry.js";
 import { tokenizeWords } from "../utils/tokenization.js";
 
@@ -27,7 +27,7 @@ const getPipeline = async (
 	}
 
 	cachedPipeline = await pipeline("feature-extraction", modelName, {
-		quantized: false,
+		dtype: "fp32",
 	});
 	cachedModelName = modelName;
 

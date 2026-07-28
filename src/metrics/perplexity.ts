@@ -4,7 +4,7 @@ import {
 	type PreTrainedModel,
 	type PreTrainedTokenizer,
 	Tensor,
-} from "@xenova/transformers";
+} from "@huggingface/transformers";
 import { withSpan } from "../telemetry.js";
 
 export interface PerplexityOptions {
@@ -35,7 +35,7 @@ const getModelAndTokenizer = async (
 	const [tokenizer, model] = await Promise.all([
 		AutoTokenizer.from_pretrained(modelName),
 		AutoModelForCausalLM.from_pretrained(modelName, {
-			quantized: false,
+			dtype: "fp32",
 		}),
 	]);
 
@@ -109,7 +109,7 @@ export const calculatePerplexity = async (
 			}
 
 			const encoded = await tokenizer(text, {
-				return_tensors: "pt",
+				return_tensor: true,
 				truncation: false,
 				add_special_tokens: true,
 			});
