@@ -4,7 +4,7 @@
  * A lightweight SDK for evaluating content quality.
  */
 
-// BERT score and perplexity use @xenova/transformers which requires sharp.
+// BERT score and perplexity use @huggingface/transformers which requires sharp.
 // Re-export types only; functions must be imported directly from submodules.
 export type {
 	BertScoreOptions,

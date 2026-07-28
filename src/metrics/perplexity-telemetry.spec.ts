@@ -13,10 +13,10 @@ const provider = new NodeTracerProvider({
 });
 provider.register();
 
-// Mock @xenova/transformers to avoid ESM/model download issues
+// Mock @huggingface/transformers to avoid ESM/model download issues
 const mockFromPretrainedTokenizer = jest.fn();
 const mockFromPretrainedModel = jest.fn();
-jest.unstable_mockModule("@xenova/transformers", () => ({
+jest.unstable_mockModule("@huggingface/transformers", () => ({
 	AutoTokenizer: { from_pretrained: mockFromPretrainedTokenizer },
 	AutoModelForCausalLM: { from_pretrained: mockFromPretrainedModel },
 	Tensor: class MockTensor {
