@@ -1,0 +1,2 @@
+repository,default_branch,removed_payloads,deleted_branches,rewrite_status,verification_status,remaining_issues
+loveholidays/eval-kit,main,0,0,not_required_already_clean,passed_fresh_fetch_all_branch_histories,Historical evidence SHAs are absent from current branch histories; no known malicious content found. Scope excludes retained non-branch refs.

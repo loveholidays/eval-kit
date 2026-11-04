@@ -1,0 +1,13 @@
+repository,branch,head_sha,reachable_commits,confirmed_malicious_commits,action
+loveholidays/eval-kit,dependabot/npm_and_yarn/csv-parse-7.0.2,ed639d4e2ab61b637e2d3e727a4d1d7a4984159f,139,0,preserved
+loveholidays/eval-kit,dependabot/npm_and_yarn/vite-7.3.7,34af4af925db590cfc002b642a80f08b3721b7b6,139,0,preserved
+loveholidays/eval-kit,dependabot/npm_and_yarn/zod-4.6.6,a11557f5bae7e0f7e37fbab6bfc7231d18c65e02,139,0,preserved
+loveholidays/eval-kit,feat/ai-content-template,edf0da6aa62b7fdff13042bff93efdcb4ff007eb,20,0,preserved
+loveholidays/eval-kit,feat/ai-evaluator-vercel-sdk,b88a55e3993f70326d7f2f3ade155fa760591fa6,9,0,preserved
+loveholidays/eval-kit,feat/batch-evaluation-streaming,cd3b4ff142a5375f0daba74e73d8ff44717a645a,16,0,preserved
+loveholidays/eval-kit,feat/coherence-perplexity-metrics,e59847f9db7be4e659314b93882e9c43689ac5dc,6,0,preserved
+loveholidays/eval-kit,feat/composite-translation-evaluator,58e2bb86f40a15c36a3c64e270bcaa59d2a1e933,25,0,preserved
+loveholidays/eval-kit,feat/github-workflows,2d63a7a9a0151440bee431bc421db819a83d5ae3,43,0,preserved
+loveholidays/eval-kit,feat/setup-sdk-skeleton,7c115c25ab83d5a1feda8553c2e0ca16bd70673b,2,0,preserved
+loveholidays/eval-kit,main,8a97b07254e27fc9ff538724cffaec57c269dee0,138,0,preserved
+loveholidays/eval-kit,ml-metrics,6b1fd647b19c8edef488d1816ddda7a5228a5519,4,0,preserved
